@@ -1,5 +1,5 @@
 # Config build structure ##########################################
-BIN = mcast-iface-tool
+BIN = mcastit
 SRC = $(wildcard *.cpp)
 OBJS = $(SRC:.cpp=.o)
 # Config build structure end ######################################
