@@ -36,6 +36,7 @@ static void cleanup()
       cout << "Error closing fd " << fd << ": " << strerror(errno) << endl;
     }
   }
+  cleanupCommon();
 }
 
 static void sigHandler(int signo)
@@ -107,7 +108,7 @@ int main(int argc, char** argv)
   {
     string ifaceName = argv[i];
     string ifaceAddress;
-    int fd = createSocketFromIfaceName(ifaceName, ifaceAddress);
+    int fd = createSocketFromIfaceName(ifaceName, ifaceAddress, true);
     if (-1 == fd)
     {
       cout << "Can't find ip address for " << ifaceName << endl;
@@ -143,7 +144,10 @@ int main(int argc, char** argv)
 
   if (g_McastModule)
   {
-    g_McastModule->run();
+    if (!g_McastModule->run())
+    {
+      cout << "Error running module, exiting..." << endl;
+    }
   }
   else
   {

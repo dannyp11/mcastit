@@ -24,6 +24,7 @@
 #include <fcntl.h>
 #include <strings.h>
 #include <sstream>
+#include <ifaddrs.h>
 
 using std::string;
 using std::cout;
@@ -55,8 +56,14 @@ private:
  *
  * @param ifaceName
  * @param ifaceIpAdress
+ * @param isIpV6 - true if create ipv6 socket
  * @return the socket created by getting the info, -1 if error
  */
-int createSocketFromIfaceName(const string& ifaceName, string& ifaceIpAdress);
+int createSocketFromIfaceName(const string& ifaceName, string& ifaceIpAdress, bool isIpV6 = false);
+
+/**
+ * Clear up internal data from Common.cpp
+ */
+void cleanupCommon();
 
 #endif /*COMMON_H_*/

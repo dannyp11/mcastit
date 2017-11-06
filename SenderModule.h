@@ -9,10 +9,11 @@ public:
   SenderModule(const vector<IfaceData>& ifaces,
       const string& mcastAddress, int mcastPort, bool loopbackOn);
   virtual ~SenderModule();
-  void run();
+  bool run();
 
 private:
   void setMcastIface(int fd, const char* ifaceName);
+  void setMcastV6Iface(int fd, const char* ifaceName);
 
 private:
   bool mIsLoopBackOn;

@@ -2,7 +2,7 @@
 
 ReceiverModule::ReceiverModule(const vector<IfaceData>& ifaces,
     const string& mcastAddress, int mcastPort) :
-    McastModuleInterface(ifaces, mcastAddress, mcastPort)
+    McastModuleInterface(ifaces, mcastAddress, mcastPort, true)
 {
 }
 
@@ -10,7 +10,7 @@ ReceiverModule::~ReceiverModule()
 {
 }
 
-void ReceiverModule::run()
+bool ReceiverModule::run()
 {
   int maxSockD = -1;
 

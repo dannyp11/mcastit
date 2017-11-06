@@ -9,7 +9,7 @@ public:
    ReceiverModule(const vector<IfaceData>& ifaces,
          const string& mcastAddress, int mcastPort);
    virtual ~ReceiverModule();
-   void run();
+   bool run();
 
 private:
    int joinMcastIface(int sock, const char* ifaceName = "");
