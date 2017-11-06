@@ -53,13 +53,22 @@ private:
 };
 
 /**
+ * Create udp socket fd and get ip address for ifaceName
  *
- * @param ifaceName
- * @param ifaceIpAdress
+ * @param ifaceName - [IN] has to be nonzero length
+ * @param ifaceIpAdress - [OUT]
  * @param isIpV6 - true if create ipv6 socket
  * @return the socket created by getting the info, -1 if error
  */
 int createSocketFromIfaceName(const string& ifaceName, string& ifaceIpAdress, bool isIpV6 = false);
+
+/**
+ * Create udp socket
+ *
+ * @param isIpV6
+ * @return socket fd, -1 if error, check errno for more info
+ */
+int createSocket(bool isIpV6 = false);
 
 /**
  * Clear up internal data from Common.cpp

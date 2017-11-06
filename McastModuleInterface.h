@@ -19,6 +19,8 @@ protected:
   vector<IfaceData> mIfaces;
   string mMcastAddress;
   int mMcastPort;
+
+private:
   int mSin_Family;
 };
 

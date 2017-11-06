@@ -29,11 +29,12 @@ bool SenderModule::run()
 
   // build addr struct
   struct sockaddr_in addr;
-  addr.sin_family = mSin_Family;
+  int sinFamily = (isIpV6())? AF_INET6 : AF_INET;
+  addr.sin_family = sinFamily;
   addr.sin_port = htons(mMcastPort);
 
   struct sockaddr_in6 addr6;
-  addr6.sin6_family = mSin_Family;
+  addr6.sin6_family = sinFamily;
   addr6.sin6_port = htons(mMcastPort);
 
   if (isIpV6())

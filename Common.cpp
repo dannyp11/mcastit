@@ -5,20 +5,23 @@
 
 static struct ifaddrs *g_ifap;
 
+int createSocket(bool isIpV6)
+{
+  int sockFamily = (isIpV6) ? AF_INET6 : AF_INET;
+  return socket(sockFamily, SOCK_DGRAM, 0);
+}
+
 int createSocketFromIfaceName(const string& ifaceName, string& ifaceIpAdress, bool isIpV6)
 {
   ifaceIpAdress = DEFAULT_IP_ADDRESS;
-  int sockFamily = (isIpV6) ? AF_INET6 : AF_INET;
-
   if (!ifaceName.size())
   {
     return -1;
   }
 
-  int fd = socket(sockFamily, SOCK_DGRAM, 0);
+  int fd = createSocket(isIpV6);
   if (-1 == fd)
   {
-    perror("creating fd");
     return -1;
   }
 

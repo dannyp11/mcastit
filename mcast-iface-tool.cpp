@@ -142,8 +142,7 @@ int main(int argc, char** argv)
 
   if (0 == g_ifaces.size())
   {
-    int inetFamily = (useIPv6)? AF_INET6 : AF_INET;
-    int sock = socket(inetFamily, SOCK_DGRAM, 0);
+    int sock = createSocket(useIPv6);
     if (sock < 0)
     {
       perror("socket");
