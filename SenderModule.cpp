@@ -58,7 +58,7 @@ bool SenderModule::run()
 
     // build message
     std::stringstream msg;
-    msg << dmsg << " " << ifaceData << "]>";
+    msg << dmsg << " " << ifaceData << ">";
 
     int numBytes = -1;
     if (!isIpV6())

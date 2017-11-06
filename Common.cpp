@@ -56,6 +56,25 @@ int createSocketFromIfaceName(const string& ifaceName, string& ifaceIpAdress, bo
         }
       }
     }
+    else if (!isIpV6 && ifa->ifa_addr->sa_family == AF_INET)
+    {
+      if (ifaceName == ifa->ifa_name)
+      {
+        if (0 == (getnameErrCode = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in), addr,
+                sizeof(addr), NULL, 0, NI_NUMERICHOST)))
+        {
+          ifaceIpAdress = addr;
+          break;
+        }
+        else
+        {
+          cout << "Error getting IP address for " << ifaceName << ": "
+              << gai_strerror(getnameErrCode) << endl;
+          close(fd);
+          return -1;
+        }
+      }
+    }
   }
 
   return fd;
