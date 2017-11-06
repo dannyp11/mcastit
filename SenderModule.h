@@ -7,7 +7,7 @@ class SenderModule: public McastModuleInterface
 {
 public:
   SenderModule(const vector<IfaceData>& ifaces,
-      const string& mcastAddress, int mcastPort, bool loopbackOn);
+      const string& mcastAddress, int mcastPort, bool loopbackOn, bool useIpV6);
   virtual ~SenderModule();
   bool run();
 

@@ -3,8 +3,11 @@
 #include "ReceiverModule.h"
 
 // Global vars
-static string g_McastAddress = "239.192.0.9";
+#define MCAST_ADDRESS_V4  "239.192.0.9"
+#define MCAST_ADDRESS_V6  "FFFE::1:FF47:0"
+
 static int g_McastPort = 50428;
+static string g_McastAddress = MCAST_ADDRESS_V4;
 
 static vector<IfaceData> g_ifaces;
 static McastModuleInterface* g_McastModule = NULL;
@@ -16,10 +19,14 @@ static void usage(int /*argc*/, char * argv[])
       << "   Multicast tool to test sending & receiving test message over various interfaces" << endl
       << "     if [iface1 iface2 ...] is blank, use system default one" << endl << endl
 
-      << "    Option:" << endl << "    -o                 turn off loop back on sender" << endl
+      << "    Option:" << endl
+      << "    -6                 use IPv6" << endl
+      << "    -m {mcast address} multicast address, default: " << MCAST_ADDRESS_V4
+                                                        << " and " << MCAST_ADDRESS_V6 << "(v6)" << endl
+      << "    -p {port}          multicast port, default: " << g_McastPort << endl << endl
+
       << "    -l                 listen mode" << endl
-      << "    -m {mcast address} multicast address, default: " << g_McastAddress << endl
-      << "    -p {port}          multicast port, default: " << g_McastPort << endl
+      << "    -o                 turn off loop back on sender" << endl
       << "    -h                 This message" << std::endl << endl;
 
   exit(1);
@@ -63,18 +70,25 @@ int main(int argc, char** argv)
 {
   bool listenMode = false;
   bool loopBackOn = true;
+  bool useIPv6 = false;
+  bool useDefaultIp = true;
+
   g_ifaces.clear();
 
   int command = -1;
-  while ((command = getopt(argc, argv, "lom:p:h")) != -1)
+  while ((command = getopt(argc, argv, "6lom:p:h")) != -1)
   {
     switch (command)
     {
+    case '6':
+      useIPv6 = true;
+      break;
     case 'o':
       loopBackOn = false;
       break;
     case 'm':
       g_McastAddress = optarg;
+      useDefaultIp = false;
       break;
     case 'p':
       g_McastPort = atoi(optarg);
@@ -87,6 +101,14 @@ int main(int argc, char** argv)
       usage(argc, argv);
       break;
     }
+  }
+
+  /*
+   * Update arguments based on getopt
+   */
+  if (useIPv6 && useDefaultIp)
+  {
+    g_McastAddress = MCAST_ADDRESS_V6;
   }
 
   /*
@@ -108,7 +130,7 @@ int main(int argc, char** argv)
   {
     string ifaceName = argv[i];
     string ifaceAddress;
-    int fd = createSocketFromIfaceName(ifaceName, ifaceAddress, true);
+    int fd = createSocketFromIfaceName(ifaceName, ifaceAddress, useIPv6);
     if (-1 == fd)
     {
       cout << "Can't find ip address for " << ifaceName << endl;
@@ -120,7 +142,8 @@ int main(int argc, char** argv)
 
   if (0 == g_ifaces.size())
   {
-    int sock = socket(AF_INET, SOCK_DGRAM, 0);
+    int inetFamily = (useIPv6)? AF_INET6 : AF_INET;
+    int sock = socket(inetFamily, SOCK_DGRAM, 0);
     if (sock < 0)
     {
       perror("socket");
@@ -135,11 +158,11 @@ int main(int argc, char** argv)
    */
   if (listenMode)
   {
-    g_McastModule = new ReceiverModule(g_ifaces, g_McastAddress, g_McastPort);
+    g_McastModule = new ReceiverModule(g_ifaces, g_McastAddress, g_McastPort, useIPv6);
   }
   else
   {
-    g_McastModule = new SenderModule(g_ifaces, g_McastAddress, g_McastPort, loopBackOn);
+    g_McastModule = new SenderModule(g_ifaces, g_McastAddress, g_McastPort, loopBackOn, useIPv6);
   }
 
   if (g_McastModule)

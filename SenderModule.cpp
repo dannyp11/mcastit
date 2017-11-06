@@ -1,8 +1,8 @@
 #include "SenderModule.h"
 
 SenderModule::SenderModule(const vector<IfaceData>& ifaces, const string& mcastAddress,
-    int mcastPort, bool loopbackOn) :
-    McastModuleInterface(ifaces, mcastAddress, mcastPort, true), mIsLoopBackOn(loopbackOn)
+    int mcastPort, bool loopbackOn, bool useIpV6) :
+    McastModuleInterface(ifaces, mcastAddress, mcastPort, useIpV6), mIsLoopBackOn(loopbackOn)
 {
   string loopMsg = (mIsLoopBackOn) ? "with" : "without";
   cout << "Sending " << loopMsg << " loopback" << endl;

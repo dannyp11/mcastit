@@ -27,7 +27,10 @@ int createSocketFromIfaceName(const string& ifaceName, string& ifaceIpAdress, bo
    */
   static bool alreadyHasIfap = false;
   if (!alreadyHasIfap)
+  {
     getifaddrs(&g_ifap);
+  }
+
   alreadyHasIfap = true;
   char addr[INET6_ADDRSTRLEN];
   int getnameErrCode;
@@ -38,9 +41,8 @@ int createSocketFromIfaceName(const string& ifaceName, string& ifaceIpAdress, bo
     {
       if (ifaceName == ifa->ifa_name)
       {
-        if (0
-            == (getnameErrCode = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in6), addr,
-                sizeof(addr), NULL, 0, NI_NUMERICHOST)))
+        if (0 == (getnameErrCode = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in6),
+                                          addr, sizeof(addr), NULL, 0, NI_NUMERICHOST)))
         {
           ifaceIpAdress = addr;
           break;

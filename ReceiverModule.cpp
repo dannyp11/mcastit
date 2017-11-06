@@ -1,8 +1,8 @@
 #include "ReceiverModule.h"
 
 ReceiverModule::ReceiverModule(const vector<IfaceData>& ifaces,
-    const string& mcastAddress, int mcastPort) :
-    McastModuleInterface(ifaces, mcastAddress, mcastPort, true)
+    const string& mcastAddress, int mcastPort, bool useIpV6) :
+    McastModuleInterface(ifaces, mcastAddress, mcastPort, useIpV6)
 {
 }
 
@@ -18,7 +18,17 @@ bool ReceiverModule::run()
   for (unsigned i = 0; i < mIfaces.size(); ++i)
   {
     int fd = mIfaces[i].sockFd;
-    int setOk = joinMcastIface(fd, mIfaces[i].ifaceName.c_str());
+    int setOk;
+
+    if (isIpV6())
+    {
+      setOk = joinMcastIfaceV6(fd, mIfaces[i].ifaceName.c_str());
+    }
+    else
+    {
+      setOk = joinMcastIface(fd, mIfaces[i].ifaceName.c_str());
+    }
+
     if (setOk != 0)
     {
       cout << "Error " << setOk << " setting mcast for " << mIfaces[i] << endl;
@@ -89,8 +99,19 @@ bool ReceiverModule::run()
             }
           }
 
-          struct sockaddr_in *sender_addr = (struct sockaddr_in*) &sender;
-          printf("%s ->%10s: ", inet_ntoa(sender_addr->sin_addr), ifaceName.c_str());
+          char senderIp[INET6_ADDRSTRLEN];
+          if (sender.ss_family == AF_INET)
+          {
+            struct sockaddr_in *sender_addr = (struct sockaddr_in*) &sender;
+            inet_ntop(sender.ss_family, &sender_addr->sin_addr, senderIp, sizeof(senderIp));
+          }
+          else if (sender.ss_family == AF_INET6)
+          {
+            struct sockaddr_in6 *sender_addr = (struct sockaddr_in6*) &sender;
+            inet_ntop(sender.ss_family, &sender_addr->sin6_addr, senderIp, sizeof(senderIp));
+          }
+
+          printf("%s ->%10s: ", senderIp, ifaceName.c_str());
           cout << rbuff << endl;
 
           FD_CLR(fd, &rfds);
@@ -153,6 +174,62 @@ int ReceiverModule::joinMcastIface(int sock, const char* ifaceName)
       mcastReqn.imr_ifindex = if_nametoindex(ifaceName);
       res = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void*) &mcastReqn, sizeof(mcastReqn));
     }
+
+    if (0 != res)
+    {
+      printf("ERR: join mcast GRP<%s> INF<%s> ERR<%s>\n", mMcastAddress.c_str(), ifaceName,
+          strerror(errno));
+    }
+  }
+
+  return res;
+}
+
+int ReceiverModule::joinMcastIfaceV6(int sock, const char* ifaceName)
+{
+  // Set the recv buffer size.
+  int res;
+  uint32_t buffSz = 1024;
+  res = setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &buffSz, sizeof(buffSz));
+  if (0 > res)
+  {
+    perror("ERR sockopt BuffSz.");
+  }
+
+  // Let's set reuse port to on to allow multiple binds per host.
+  int opt = 1;
+  res = setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+  if (0 > res)
+  {
+    perror("ERR sockopt REUSEADDR.");
+    return -1;
+  }
+
+  // Bind the socket to the multicast port.
+  struct sockaddr_in6 bindAddr;
+  memset(&bindAddr, 0, sizeof(bindAddr));
+  bindAddr.sin6_family = AF_INET6;
+  bindAddr.sin6_port = htons(mMcastPort);
+  res = ::bind(sock, (struct sockaddr *) &bindAddr, sizeof(bindAddr));
+  if (0 > res)
+  {
+    perror("ERR bind.");
+    return -1;
+  }
+
+  // Now we need to see if they have specified which interface we need to
+  // multicast out of.
+  {
+    struct ipv6_mreq mcastReq;
+    res = -1;
+    if (inet_pton(AF_INET6, mMcastAddress.c_str(), &mcastReq.ipv6mr_multiaddr) != 1)
+    {
+      cout << "Error parsing address for " << mMcastAddress << endl;
+      return -1;
+    }
+
+    mcastReq.ipv6mr_interface = if_nametoindex(ifaceName);
+    res = setsockopt(sock, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, (void*) &mcastReq, sizeof(mcastReq));
 
     if (0 != res)
     {

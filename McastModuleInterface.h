@@ -27,7 +27,7 @@ inline McastModuleInterface::McastModuleInterface(const vector<IfaceData>& iface
     mIfaces(ifaces), mMcastAddress(mcastAddress), mMcastPort(mcastPort)
 {
   string ipVer = (useIpV6)? "IPV6" : "IPV4";
-  cout << "MCAST with " << ipVer << " " << mcastAddress << ":" << mcastPort << endl;
+  cout << "MCAST with " << ipVer << " " << mcastAddress << " port " << mcastPort << endl;
   mSin_Family = (useIpV6)? AF_INET6 : AF_INET;
 }
 
