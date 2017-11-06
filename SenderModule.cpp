@@ -16,9 +16,7 @@ void SenderModule::run()
 {
   for (unsigned i = 0; i < mIfaces.size(); ++i)
   {
-    int sock = mIfaces[i].sockFd;
-    string ifaceName = (mIfaces[i].ifaceName == DEFAULT_IFACE) ? "" : mIfaces[i].ifaceName;
-    setMcastIface(sock, ifaceName.c_str());
+    setMcastIface(mIfaces[i].sockFd, mIfaces[i].ifaceName.c_str());
   }
   cout << "==============================================================" << endl;
 
@@ -28,7 +26,7 @@ void SenderModule::run()
   addr.sin_addr.s_addr = inet_addr(mMcastAddress.c_str());
   addr.sin_port = htons(mMcastPort);
 
-  const string dmsg = "<Sender info";
+  const string dmsg = "<Sender info:";
 
   for (unsigned i = 0; i < mIfaces.size(); ++i)
   {
@@ -37,12 +35,11 @@ void SenderModule::run()
 
     // build message
     std::stringstream msg;
-    msg << dmsg << " iface[" << ifaceData.ifaceName << "] address[" << ifaceData.ifaceAddress
-        << "]>";
+    msg << dmsg << " " << ifaceData << "]>";
 
     int numBytes = sendto(fd, msg.str().c_str(), 1 + msg.str().size(),
                           MSG_NOSIGNAL, (struct sockaddr *) &addr, sizeof(addr));
-    cout << "sent to [" << ifaceData.ifaceName << "] bytes: " << numBytes << endl;
+    cout << "sent to [" << ifaceData << "] bytes: " << numBytes << endl;
     if (0 > numBytes)
     {
       perror("recv");
@@ -83,7 +80,7 @@ void SenderModule::setMcastIface(int fd, const char* ifaceName)
   }
 
   // if iface name specified, set iface name for the socket
-  if (0 < strlen(ifaceName) || string(ifaceName) != DEFAULT_IFACE)
+  if (0 < strlen(ifaceName))
   {
     ifaddrn.imr_ifindex = if_nametoindex(ifaceName);
     res = setsockopt(fd, IPPROTO_IP, IP_MULTICAST_IF, &ifaddrn, sizeof(ifaddrn));

@@ -1,10 +1,13 @@
 #include "Common.h"
 
+#define DEFAULT_IP_ADDRESS  "0.0.0.0"
+#define DEFAULT_IFACE       "default"
+
 int createSocketFromIfaceName(const string& ifaceName, string& ifaceIpAdress)
 {
   ifaceIpAdress = DEFAULT_IP_ADDRESS;
 
-  if (!ifaceName.size() || ifaceName == DEFAULT_IFACE)
+  if (!ifaceName.size())
   {
     return -1;
   }
@@ -34,3 +37,31 @@ int createSocketFromIfaceName(const string& ifaceName, string& ifaceIpAdress)
   return fd;
 }
 
+const string& IfaceData::toString() const
+{
+  static string result;
+  std::stringstream stm;
+
+  stm << getReadableName() << " (" << getReadableAddress() << ")";
+  result = stm.str();
+  return result;
+}
+
+const string& IfaceData::getReadableName() const
+{
+  static string result = DEFAULT_IFACE;
+  if (ifaceName.size()) result = ifaceName;
+  return result;
+}
+
+const string& IfaceData::getReadableAddress() const
+{
+  static string result = DEFAULT_IP_ADDRESS;
+  if (ifaceAddress.size()) result = ifaceAddress;
+  return result;
+}
+
+std::ostream & operator<<(std::ostream &os, const IfaceData& iface)
+{
+  return os << iface.toString();
+}

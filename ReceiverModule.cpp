@@ -18,16 +18,14 @@ void ReceiverModule::run()
   for (unsigned i = 0; i < mIfaces.size(); ++i)
   {
     int fd = mIfaces[i].sockFd;
-    string ifaceName = (mIfaces[i].ifaceName == DEFAULT_IFACE) ? "" : mIfaces[i].ifaceName;
-    int setOk = joinMcastIface(fd, ifaceName.c_str());
+    int setOk = joinMcastIface(fd, mIfaces[i].ifaceName.c_str());
     if (setOk != 0)
     {
-      cout << "error " << setOk << " setting mcast for " << mIfaces[i].ifaceName << endl;
+      cout << "Error " << setOk << " setting mcast for " << mIfaces[i] << endl;
     }
     else
     {
-      cout << "Interface " << mIfaces[i].ifaceName
-           << " address " << mIfaces[i].ifaceAddress << " [OK]" << endl;
+      cout << "Interface " << mIfaces[i] << " [OK]" << endl;
     }
 
     maxSockD = (maxSockD < fd) ? fd : maxSockD;
@@ -81,12 +79,12 @@ void ReceiverModule::run()
           /*
            * Get ifaceName from fd
            */
-          string ifaceName = DEFAULT_IFACE;
+          string ifaceName = "not found";
           for (unsigned iii = 0; iii < mIfaces.size(); ++iii)
           {
             if (mIfaces[iii].sockFd == fd)
             {
-              ifaceName = mIfaces[iii].ifaceName;
+              ifaceName = mIfaces[iii].getReadableName();
               break;
             }
           }

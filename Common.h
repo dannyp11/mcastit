@@ -30,17 +30,25 @@ using std::cout;
 using std::endl;
 using std::vector;
 
-#define DEFAULT_IFACE   "default"
-#define DEFAULT_IP_ADDRESS "0.0.0.0"
-
+/**
+ * Struct that contains interface name and its associated socket
+ */
 struct IfaceData
 {
   int sockFd;
   string ifaceName;
   string ifaceAddress;
 
+  IfaceData(): sockFd(-1), ifaceName(""), ifaceAddress("") {}
   IfaceData(const string& name, const string& address, int fd = -1):
     sockFd(fd), ifaceName(name), ifaceAddress(address) {}
+
+  const string& getReadableName() const;
+  const string& getReadableAddress() const;
+  const string& toString() const;
+
+private:
+  friend std::ostream & operator<<(std::ostream &os, const IfaceData& iface);
 };
 
 /**
