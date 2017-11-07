@@ -4,6 +4,7 @@
 #define DEFAULT_IFACE       "default"
 
 static struct ifaddrs *g_ifap;
+static bool g_debugMode = false;
 
 int createSocket(bool isIpV6)
 {
@@ -13,7 +14,7 @@ int createSocket(bool isIpV6)
 
 int createSocketFromIfaceName(const string& ifaceName, string& ifaceIpAdress, bool isIpV6)
 {
-  ifaceIpAdress = DEFAULT_IP_ADDRESS;
+  ifaceIpAdress = "";
   if (!ifaceName.size())
   {
     return -1;
@@ -31,15 +32,26 @@ int createSocketFromIfaceName(const string& ifaceName, string& ifaceIpAdress, bo
   static bool alreadyHasIfap = false;
   if (!alreadyHasIfap)
   {
-    getifaddrs(&g_ifap);
+    if (0 != getifaddrs(&g_ifap))
+    {
+      LOG_ERROR("Can't get system interfaces: " << strerror(errno));
+      return -1;
+    }
+    alreadyHasIfap = true;
   }
 
-  alreadyHasIfap = true;
   char addr[INET6_ADDRSTRLEN];
   int getnameErrCode;
 
   for (struct ifaddrs* ifa = g_ifap; ifa; ifa = ifa->ifa_next)
   {
+    // make sure ifa_addr is valid
+    if (!ifa->ifa_addr)
+    {
+      continue;
+    }
+
+    // Check ipv6 interface
     if (isIpV6 && ifa->ifa_addr->sa_family == AF_INET6)
     {
       if (ifaceName == ifa->ifa_name)
@@ -52,13 +64,14 @@ int createSocketFromIfaceName(const string& ifaceName, string& ifaceIpAdress, bo
         }
         else
         {
-          cout << "Error getting IPv6 address for " << ifaceName << ": "
-              << gai_strerror(getnameErrCode) << endl;
+          LOG_ERROR("Error getting IPv6 address for " << ifaceName << ": "
+                      << gai_strerror(getnameErrCode));
           close(fd);
           return -1;
         }
       }
     }
+    // check ipv4 interface
     else if (!isIpV6 && ifa->ifa_addr->sa_family == AF_INET)
     {
       if (ifaceName == ifa->ifa_name)
@@ -71,13 +84,20 @@ int createSocketFromIfaceName(const string& ifaceName, string& ifaceIpAdress, bo
         }
         else
         {
-          cout << "Error getting IP address for " << ifaceName << ": "
-              << gai_strerror(getnameErrCode) << endl;
+          LOG_ERROR("Error getting IP address for " << ifaceName << ": "
+              << gai_strerror(getnameErrCode));
           close(fd);
           return -1;
         }
       }
     }
+  }
+
+  // Make sure iface ip address has to be found, which means iface name is valid
+  if (!ifaceIpAdress.length())
+  {
+    close(fd);
+    return -1;
   }
 
   return fd;
@@ -117,4 +137,14 @@ std::ostream & operator<<(std::ostream &os, const IfaceData& iface)
 void cleanupCommon()
 {
   freeifaddrs(g_ifap);
+}
+
+void setDebugMode(bool enable)
+{
+  g_debugMode = enable;
+}
+
+bool isDebugMode()
+{
+  return g_debugMode;
 }

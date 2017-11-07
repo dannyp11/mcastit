@@ -3,6 +3,9 @@
 
 #include "Common.h"
 
+/**
+ * The interface that handles both reader/writer child classes
+ */
 class McastModuleInterface
 {
 public:
@@ -10,13 +13,16 @@ public:
                        int mcastPort, bool useIpV6 = false);
   virtual ~McastModuleInterface() {}
 
+  /**
+   * Main runner function, should not be inside a loop
+   * @return true if run successfully
+   */
   virtual bool run() = 0;
 
-protected:
   bool isIpV6() const;
 
 protected:
-  vector<IfaceData> mIfaces;
+  vector<IfaceData> mIfaces; // all interfaces to be listened/sent to
   string mMcastAddress;
   int mMcastPort;
 

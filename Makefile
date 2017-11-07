@@ -4,7 +4,7 @@ DEBUG = -Os
 CFLAGS = -rdynamic -Wall -Wextra -Werror $(DEBUG)
 IFLAGS = -I. 
 LDFLAGS = -pthread
-ARCHFLAGS = -m32
+ARCHFLAGS = 
 # Compiler flags ends ---------------------------------------------
 
 # Config build structure ##########################################

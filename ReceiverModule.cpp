@@ -6,10 +6,6 @@ ReceiverModule::ReceiverModule(const vector<IfaceData>& ifaces,
 {
 }
 
-ReceiverModule::~ReceiverModule()
-{
-}
-
 bool ReceiverModule::run()
 {
   int maxSockD = -1;
@@ -31,7 +27,8 @@ bool ReceiverModule::run()
 
     if (setOk != 0)
     {
-      cout << "Error " << setOk << " setting mcast for " << mIfaces[i] << endl;
+      LOG_ERROR("Error " << setOk << " setting mcast for " << mIfaces[i]);
+      return false;
     }
     else
     {
@@ -59,78 +56,85 @@ bool ReceiverModule::run()
     timeout.tv_usec = 1;
     int numReady = select(maxSockD + 1, &rfds, NULL, NULL, &timeout);
     if (numReady == 0)
+    {
       continue;
+    }
 
-    // print message
+    // for each found sock fd that detected from select()
     for (int i = 0; i < numReady; ++i)
     {
+      // Retrieve the fd that has data
+      IfaceData ifaceData;
+      int fd;
+
+      bool foundIfaceData = false;
       for (unsigned ii = 0; ii < mIfaces.size(); ++ii)
       {
-        int fd = mIfaces[ii].sockFd;
+        fd = mIfaces[ii].sockFd;
         if (FD_ISSET(fd, &rfds))
         {
-          uint8_t buff_[1024];
-          uint8_t *rbuff = buff_;
-          uint32_t rbuffsz = sizeof(buff_);
-
-          // get sender data
-          struct sockaddr_storage sender;
-          socklen_t sendsize = sizeof(sender);
-          bzero(&sender, sizeof(sender));
-
-          ssize_t dataSize = ::recvfrom(fd, rbuff, rbuffsz, 0, (struct sockaddr*) &sender,
-              &sendsize);
-
-          if (0 > dataSize)
-          {
-            perror("recvfrom");
-          }
-
-          /*
-           * Get ifaceName from fd
-           */
-          string ifaceName = "not found";
-          for (unsigned iii = 0; iii < mIfaces.size(); ++iii)
-          {
-            if (mIfaces[iii].sockFd == fd)
-            {
-              ifaceName = mIfaces[iii].getReadableName();
-              break;
-            }
-          }
-
-          char senderIp[INET6_ADDRSTRLEN];
-          if (sender.ss_family == AF_INET)
-          {
-            struct sockaddr_in *sender_addr = (struct sockaddr_in*) &sender;
-            inet_ntop(sender.ss_family, &sender_addr->sin_addr, senderIp, sizeof(senderIp));
-          }
-          else if (sender.ss_family == AF_INET6)
-          {
-            struct sockaddr_in6 *sender_addr = (struct sockaddr_in6*) &sender;
-            inet_ntop(sender.ss_family, &sender_addr->sin6_addr, senderIp, sizeof(senderIp));
-          }
-
-          printf("%s ->%10s: ", senderIp, ifaceName.c_str());
-          cout << rbuff << endl;
-
+          ifaceData = mIfaces[ii];
           FD_CLR(fd, &rfds);
+          foundIfaceData = true;
           break;
         }
       }
+
+      if (!foundIfaceData)
+      {
+        LOG_ERROR("No socket fd found in member var, something is very wrong here");
+        return false;
+      }
+
+      int8_t buffer[MCAST_BUFF_LEN];
+      uint32_t rbuffsz = sizeof(buffer);
+
+      // get sender data
+      struct sockaddr_storage sender;
+      socklen_t sendsize = sizeof(sender);
+      bzero(&sender, sizeof(sender));
+
+      if (0 > recvfrom(fd, buffer, rbuffsz, 0, (struct sockaddr*) &sender, &sendsize))
+      {
+        LOG_ERROR("recvfrom " << ifaceData << ": " << strerror(errno));
+        continue;
+      }
+
+      // get the sender info
+      char senderIp[INET6_ADDRSTRLEN];
+      if (sender.ss_family == AF_INET)
+      {
+        struct sockaddr_in *sender_addr = (struct sockaddr_in*) &sender;
+        inet_ntop(sender.ss_family, &sender_addr->sin_addr, senderIp, sizeof(senderIp));
+      }
+      else if (sender.ss_family == AF_INET6)
+      {
+        struct sockaddr_in6 *sender_addr = (struct sockaddr_in6*) &sender;
+        inet_ntop(sender.ss_family, &sender_addr->sin6_addr, senderIp, sizeof(senderIp));
+      }
+
+      // print result message
+      printf("%s ->%10s: %s\n", senderIp, ifaceData.getReadableName().c_str(), buffer);
+
+      // rm fd so that it's not processed again
+      FD_CLR(fd, &rfds);
+      break;
     }
   }
+
+  return true;
 }
 
 int ReceiverModule::joinMcastIface(int sock, const char* ifaceName)
 {
   // Set the recv buffer size.
   int res;
-  uint32_t buffSz = 1024;
+  uint32_t buffSz = MCAST_BUFF_LEN;
   res = setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &buffSz, sizeof(buffSz));
   if (0 > res)
   {
-    perror("ERR sockopt BuffSz.");
+    LOG_ERROR("joinMcastIface sockopt BuffSz: " << strerror(errno));
+    return -1;
   }
 
   // Let's set reuse port to on to allow multiple binds per host.
@@ -138,7 +142,7 @@ int ReceiverModule::joinMcastIface(int sock, const char* ifaceName)
   res = setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
   if (0 > res)
   {
-    perror("ERR sockopt REUSEADDR.");
+    LOG_ERROR("joinMcastIface sockopt SO_REUSEADDR: " << strerror(errno));
     return -1;
   }
 
@@ -151,35 +155,31 @@ int ReceiverModule::joinMcastIface(int sock, const char* ifaceName)
   res = ::bind(sock, (struct sockaddr *) &bindAddr, sizeof(bindAddr));
   if (0 > res)
   {
-    perror("ERR bind.");
+    LOG_ERROR("joinMcastIface bind: " << strerror(errno));
     return -1;
   }
 
-  // Now we need to see if they have specified which interface we need to
-  // multicast out of.
+  // If ifaceName is specified, bind directly to that iface,
+  // otherwise bind to general interface
+  if (0 == strlen(ifaceName))
   {
     struct ip_mreq mcastReq;
+    mcastReq.imr_multiaddr.s_addr = inet_addr(mMcastAddress.c_str());
+    mcastReq.imr_interface.s_addr = htonl(INADDR_ANY);
+    res = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void*) &mcastReq, sizeof(mcastReq));
+  }
+  else
+  {
     struct ip_mreqn mcastReqn;
-    res = -1;
+    mcastReqn.imr_multiaddr.s_addr = inet_addr(mMcastAddress.c_str());
+    mcastReqn.imr_ifindex = if_nametoindex(ifaceName);
+    res = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void*) &mcastReqn, sizeof(mcastReqn));
+  }
 
-    if (0 == strlen(ifaceName))
-    {
-      mcastReq.imr_multiaddr.s_addr = inet_addr(mMcastAddress.c_str());
-      mcastReq.imr_interface.s_addr = htonl(INADDR_ANY);
-      res = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void*) &mcastReq, sizeof(mcastReq));
-    }
-    else
-    {
-      mcastReqn.imr_multiaddr.s_addr = inet_addr(mMcastAddress.c_str());
-      mcastReqn.imr_ifindex = if_nametoindex(ifaceName);
-      res = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void*) &mcastReqn, sizeof(mcastReqn));
-    }
-
-    if (0 != res)
-    {
-      printf("ERR: join mcast GRP<%s> INF<%s> ERR<%s>\n", mMcastAddress.c_str(), ifaceName,
-          strerror(errno));
-    }
+  if (0 != res)
+  {
+    printf("Error: join mcast group<%s> interface<%s>: %s\n",
+              mMcastAddress.c_str(), ifaceName, strerror(errno));
   }
 
   return res;
@@ -189,11 +189,12 @@ int ReceiverModule::joinMcastIfaceV6(int sock, const char* ifaceName)
 {
   // Set the recv buffer size.
   int res;
-  uint32_t buffSz = 1024;
+  uint32_t buffSz = MCAST_BUFF_LEN;
   res = setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &buffSz, sizeof(buffSz));
   if (0 > res)
   {
-    perror("ERR sockopt BuffSz.");
+    LOG_ERROR("joinMcastIface sockopt BuffSz: " << strerror(errno));
+    return -1;
   }
 
   // Let's set reuse port to on to allow multiple binds per host.
@@ -201,7 +202,7 @@ int ReceiverModule::joinMcastIfaceV6(int sock, const char* ifaceName)
   res = setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
   if (0 > res)
   {
-    perror("ERR sockopt REUSEADDR.");
+    LOG_ERROR("joinMcastIface sockopt SO_REUSEADDR: " << strerror(errno));
     return -1;
   }
 
@@ -213,29 +214,26 @@ int ReceiverModule::joinMcastIfaceV6(int sock, const char* ifaceName)
   res = ::bind(sock, (struct sockaddr *) &bindAddr, sizeof(bindAddr));
   if (0 > res)
   {
-    perror("ERR bind.");
+    LOG_ERROR("joinMcastIface bind: " << strerror(errno));
     return -1;
   }
 
-  // Now we need to see if they have specified which interface we need to
-  // multicast out of.
+  // If ifaceName is specified, bind directly to that iface,
+  // otherwise bind to general interface
+  struct ipv6_mreq mcastReq;
+  if (inet_pton(AF_INET6, mMcastAddress.c_str(), &mcastReq.ipv6mr_multiaddr) != 1)
   {
-    struct ipv6_mreq mcastReq;
-    res = -1;
-    if (inet_pton(AF_INET6, mMcastAddress.c_str(), &mcastReq.ipv6mr_multiaddr) != 1)
-    {
-      cout << "Error parsing address for " << mMcastAddress << endl;
-      return -1;
-    }
+    LOG_ERROR("Error parsing address for " << mMcastAddress);
+    return -1;
+  }
 
-    mcastReq.ipv6mr_interface = if_nametoindex(ifaceName);
-    res = setsockopt(sock, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, (void*) &mcastReq, sizeof(mcastReq));
+  mcastReq.ipv6mr_interface = if_nametoindex(ifaceName); // no need to check since it will return 0 on error
+  res = setsockopt(sock, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, (void*) &mcastReq, sizeof(mcastReq));
 
-    if (0 != res)
-    {
-      printf("ERR: join mcast GRP<%s> INF<%s> ERR<%s>\n", mMcastAddress.c_str(), ifaceName,
-          strerror(errno));
-    }
+  if (0 != res)
+  {
+    printf("ERR: join mcast GRP<%s> INF<%s> ERR<%s>\n", mMcastAddress.c_str(), ifaceName,
+        strerror(errno));
   }
 
   return res;

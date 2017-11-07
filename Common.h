@@ -31,6 +31,14 @@ using std::cout;
 using std::endl;
 using std::vector;
 
+#define MCAST_BUFF_LEN    (1024)  // message length
+
+// print out error message to stderr
+#define LOG_ERROR(msg) \
+    do {if (!isDebugMode()) std::cerr << "[ERROR] " << msg << endl;\
+        else std::cerr << __FILE__ << ":" << __LINE__ << " [ERROR] " << msg << endl;\
+    } while(0)
+
 /**
  * Struct that contains interface name and its associated socket
  */
@@ -74,5 +82,11 @@ int createSocket(bool isIpV6 = false);
  * Clear up internal data from Common.cpp
  */
 void cleanupCommon();
+
+/**
+ * Getter/setter for debug mode
+ */
+void setDebugMode(bool enable = true);
+bool isDebugMode();
 
 #endif /*COMMON_H_*/

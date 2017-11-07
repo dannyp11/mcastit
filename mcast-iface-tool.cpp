@@ -3,11 +3,11 @@
 #include "ReceiverModule.h"
 
 // Global vars
-#define MCAST_ADDRESS_V4  "239.192.0.9"
-#define MCAST_ADDRESS_V6  "FFFE::1:FF47:0"
+#define DEFAULT_MCAST_ADDRESS_V4  "239.192.0.9"
+#define DEFAULT_MCAST_ADDRESS_V6  "FFFE::1:FF47:0"
 
 static int g_McastPort = 50428;
-static string g_McastAddress = MCAST_ADDRESS_V4;
+static string g_McastAddress = DEFAULT_MCAST_ADDRESS_V4;
 
 static vector<IfaceData> g_ifaces;
 static McastModuleInterface* g_McastModule = NULL;
@@ -21,8 +21,8 @@ static void usage(int /*argc*/, char * argv[])
 
       << "    Option:" << endl
       << "    -6                 use IPv6" << endl
-      << "    -m {mcast address} multicast address, default: " << MCAST_ADDRESS_V4
-                                                        << " and " << MCAST_ADDRESS_V6 << "(v6)" << endl
+      << "    -m {mcast address} multicast address, default: " << DEFAULT_MCAST_ADDRESS_V4
+                                                        << " and " << DEFAULT_MCAST_ADDRESS_V6 << "(v6)" << endl
       << "    -p {port}          multicast port, default: " << g_McastPort << endl << endl
 
       << "    -l                 listen mode" << endl
@@ -40,30 +40,34 @@ static void cleanup()
     int fd = g_ifaces[i].sockFd;
     if (fd >=0 && (0 != close(fd)))
     {
-      cout << "Error closing fd " << fd << ": " << strerror(errno) << endl;
+      LOG_ERROR("Close socket " << fd << ": " << strerror(errno));
     }
   }
   cleanupCommon();
 }
 
+static void safeExit(int errCode = 0)
+{
+  cleanup();
+  exit(errCode);
+}
+
 static void sigHandler(int signo)
 {
-  cout << "Caught signal " << signo << endl;
-  cleanup();
-  exit(0);
+  cout << " Caught signal " << signo << endl;
+  safeExit(0);
 }
 
 static void errorHandler(int signo)
 {
-  cout << "Caught error signal " << signo << endl;
+  cout << " Caught error signal " << signo << endl;
   void *array[10];
   size_t size = backtrace(array, 10);
 
   // print out all the frames to stderr
   backtrace_symbols_fd(array, size, STDERR_FILENO);
 
-  cleanup();
-  exit(1);
+  safeExit(signo);
 }
 
 int main(int argc, char** argv)
@@ -76,7 +80,7 @@ int main(int argc, char** argv)
   g_ifaces.clear();
 
   int command = -1;
-  while ((command = getopt(argc, argv, "6lom:p:h")) != -1)
+  while ((command = getopt(argc, argv, "D6lom:p:h")) != -1)
   {
     switch (command)
     {
@@ -96,6 +100,10 @@ int main(int argc, char** argv)
     case 'l':
       listenMode = true;
       break;
+    case 'D':
+      cout << "Debug mode ON" << endl;
+      setDebugMode(true);
+      break;
     case 'h':
     default:
       usage(argc, argv);
@@ -108,7 +116,7 @@ int main(int argc, char** argv)
    */
   if (useIPv6 && useDefaultIp)
   {
-    g_McastAddress = MCAST_ADDRESS_V6;
+    g_McastAddress = DEFAULT_MCAST_ADDRESS_V6;
   }
 
   /*
@@ -128,13 +136,13 @@ int main(int argc, char** argv)
    */
   for (int i = optind; i < argc; ++i)
   {
-    string ifaceName = argv[i];
+    const string ifaceName = argv[i];
     string ifaceAddress;
     int fd = createSocketFromIfaceName(ifaceName, ifaceAddress, useIPv6);
     if (-1 == fd)
     {
-      cout << "Can't find ip address for " << ifaceName << endl;
-      exit(1);
+      LOG_ERROR("Can't find ip address for " << ifaceName);
+      safeExit(1);
     }
 
     g_ifaces.push_back((IfaceData(ifaceName, ifaceAddress, fd)));
@@ -145,8 +153,8 @@ int main(int argc, char** argv)
     int sock = createSocket(useIPv6);
     if (sock < 0)
     {
-      perror("socket");
-      exit(1);
+      LOG_ERROR("Creating socket: " << strerror(errno));
+      safeExit(1);
     }
 
     g_ifaces.push_back(IfaceData("", "", sock));
