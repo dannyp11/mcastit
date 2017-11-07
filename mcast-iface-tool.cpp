@@ -3,10 +3,10 @@
 #include "ReceiverModule.h"
 
 // Global vars
-#define DEFAULT_MCAST_ADDRESS_V4  "239.192.0.9"
+#define DEFAULT_MCAST_ADDRESS_V4  "239.192.0.123"
 #define DEFAULT_MCAST_ADDRESS_V6  "FFFE::1:FF47:0"
 
-static int g_McastPort = 50428;
+static int g_McastPort = 12321;
 static string g_McastAddress = DEFAULT_MCAST_ADDRESS_V4;
 
 static vector<IfaceData> g_ifaces;

@@ -21,28 +21,28 @@ Therefore, may I introduce you mcastit: a network tool that specializes in netwo
 ./mcastit [options] [iface1 iface2 ...]
     Option:
     -6                 use IPv6
-    -m {mcast address} multicast address, default: 239.192.0.9 and FFFE::1:FF47:0(v6)
-    -p {port}          multicast port, default: 50428
+    -m {mcast address} multicast address, default: 239.192.0.123 and FFFE::1:FF47:0(v6)
+    -p {port}          multicast port, default: 54321
 
     -l                 listen mode
     -o                 turn off loop back on sender
     -h                 This message
 ```
 ### Examples
-Sender on interface docker0 & wlp4s0 for multicast address 239.192.0.123 port 12321:
+Sender on interface docker0 & wlp4s0 for multicast address 224.1.1.1 port 12321:
 ```
-./mcastit -m 239.192.0.123 -p 12321 wlp4s0 docker0
-MCAST with IPV4 239.192.0.123 port 12321
+./mcastit -m 224.1.1.1 -p 12321 wlp4s0 docker0
+MCAST with IPV4 224.1.1.1 port 12321
 Sending with loopback
 ==============================================================
 [OK] sent to [wlp4s0 (192.168.0.7)] bytes: 36
 [OK] sent to [docker0 (172.17.0.1)] bytes: 36
 ```
 
-Listener on interface docker0 & wlp4s0 for multicast address 239.192.0.123 port 12321:
+Listener on interface docker0 & wlp4s0 for multicast address 224.1.1.1 port 12321:
 ```
-./mcastit -l -m 239.192.0.123 -p 12321 wlp4s0 docker0
-MCAST with IPV4 239.192.0.123 port 12321
+./mcastit -l -m 224.1.1.1 -p 12321 wlp4s0 docker0
+MCAST with IPV4 224.1.1.1 port 12321
 Listening ...
 Interface wlp4s0 (192.168.0.7) [OK]
 Interface docker0 (172.17.0.1) [OK]
