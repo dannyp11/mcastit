@@ -123,7 +123,7 @@ bool ReceiverModule::run()
       }
 
       // print result message
-      printf("%s ->%10s: %s\n", senderIp, ifaceData.getReadableName().c_str(), buffer);
+      printf("%s: %s\n", senderIp, buffer);
 
       // rm fd so that it's not processed again
       FD_CLR(fd, &rfds);
@@ -162,7 +162,8 @@ int ReceiverModule::joinMcastIface(int sock, const char* ifaceName)
   bindAddr.sin_addr.s_addr = htonl(INADDR_ANY);
   bindAddr.sin_port = htons(mMcastPort);
   res = ::bind(sock, (struct sockaddr *) &bindAddr, sizeof(bindAddr));
-  if (0 > res)
+  if (0 > res && errno != EINVAL)
+  // ignore EINVAL for allowing multiple mcast interfaces in same socket
   {
     LOG_ERROR("joinMcastIface bind: " << strerror(errno));
     return -1;
@@ -202,7 +203,7 @@ int ReceiverModule::joinMcastIfaceV6(int sock, const char* ifaceName)
   res = setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &buffSz, sizeof(buffSz));
   if (0 > res)
   {
-    LOG_ERROR("joinMcastIface sockopt BuffSz: " << strerror(errno));
+    LOG_ERROR("joinMcastIfaceV6 sockopt BuffSz: " << strerror(errno));
     return -1;
   }
 
@@ -211,7 +212,7 @@ int ReceiverModule::joinMcastIfaceV6(int sock, const char* ifaceName)
   res = setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
   if (0 > res)
   {
-    LOG_ERROR("joinMcastIface sockopt SO_REUSEADDR: " << strerror(errno));
+    LOG_ERROR("joinMcastIfaceV6 sockopt SO_REUSEADDR: " << strerror(errno));
     return -1;
   }
 
@@ -221,9 +222,10 @@ int ReceiverModule::joinMcastIfaceV6(int sock, const char* ifaceName)
   bindAddr.sin6_family = AF_INET6;
   bindAddr.sin6_port = htons(mMcastPort);
   res = ::bind(sock, (struct sockaddr *) &bindAddr, sizeof(bindAddr));
-  if (0 > res)
+  if (0 > res && errno != EINVAL)
+    // ignore EINVAL for allowing multiple mcast interfaces in same socket
   {
-    LOG_ERROR("joinMcastIface bind: " << strerror(errno));
+    LOG_ERROR("joinMcastIfaceV6 bind: " << strerror(errno));
     return -1;
   }
 
@@ -256,7 +258,7 @@ int ReceiverModule::joinMcastIfaceAddress(int sock, const char* ifaceIpAddress)
   res = setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &buffSz, sizeof(buffSz));
   if (0 > res)
   {
-    LOG_ERROR("joinMcastIface sockopt BuffSz: " << strerror(errno));
+    LOG_ERROR("joinMcastIfaceAddress sockopt BuffSz: " << strerror(errno));
     return -1;
   }
 
@@ -265,7 +267,7 @@ int ReceiverModule::joinMcastIfaceAddress(int sock, const char* ifaceIpAddress)
   res = setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
   if (0 > res)
   {
-    LOG_ERROR("joinMcastIface sockopt SO_REUSEADDR: " << strerror(errno));
+    LOG_ERROR("joinMcastIfaceAddress sockopt SO_REUSEADDR: " << strerror(errno));
     return -1;
   }
 
@@ -276,9 +278,10 @@ int ReceiverModule::joinMcastIfaceAddress(int sock, const char* ifaceIpAddress)
   bindAddr.sin_addr.s_addr = htonl(INADDR_ANY);
   bindAddr.sin_port = htons(mMcastPort);
   res = ::bind(sock, (struct sockaddr *) &bindAddr, sizeof(bindAddr));
-  if (0 > res)
+  if (0 > res && errno != EINVAL)
+    // ignore EINVAL for allowing multiple mcast interfaces in same socket
   {
-    LOG_ERROR("joinMcastIface bind: " << strerror(errno));
+    LOG_ERROR("joinMcastIfaceAddress bind: " << strerror(errno));
     return -1;
   }
 
@@ -291,9 +294,6 @@ int ReceiverModule::joinMcastIfaceAddress(int sock, const char* ifaceIpAddress)
   }
   else
   {
-//    struct sockaddr_in iface_addr_in;
-//    inet_pton(AF_INET, ifaceIpAddress, &iface_addr_in.sin_addr);
-//    mcastReq.imr_interface.s_addr = iface_addr_in.sin_addr.s_addr;
     mcastReq.imr_interface.s_addr = inet_addr(ifaceIpAddress);
   }
 

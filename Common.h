@@ -62,24 +62,24 @@ private:
 };
 
 /**
- * Create udp socket fd and get ip address for ifaceName
+ * Get ip address for ifaceName
  *
  * @param ifaceName - [IN] has to be nonzero length
  * @param ifaceIpAdress - [OUT]
  * @param isIpV6 - true if create ipv6 socket
- * @return the socket created by getting the info, -1 if error
+ * @return 0 on success, -1 if error
  */
-int createSocketFromIfaceName(const string& ifaceName, string& ifaceIpAdress, bool isIpV6 = false);
+int getIfaceIPFromIfaceName(const string& ifaceName, string& ifaceIpAdress, bool isIpV6 = false);
 
 /**
- * Similar to createSocketFromIfaceName but use interface IP address as input
+ * Get ifaceName from IP address
  *
  * @param ifaceIpAddress  - [IN] has to be nonzero length
  * @param ifaceName       - [OUT] resolved interface name
  * @param isIpV6          - true if create ipv6 socket
- * @return the socket created by getting the info, -1 if error
+ * @return 0 on success, -1 if error
  */
-int createSocketFromIfaceAddress(const string& ifaceIpAddress, string& ifaceName, bool isIpV6 = false);
+int getIfaceNameFromIfaceAddress(const string& ifaceIpAddress, string& ifaceName, bool isIpV6 = false);
 
 /**
  * Create udp socket

@@ -32,16 +32,10 @@ int createSocket(bool isIpV6)
   return socket(sockFamily, SOCK_DGRAM, 0);
 }
 
-int createSocketFromIfaceName(const string& ifaceName, string& ifaceIpAdress, bool isIpV6)
+int getIfaceIPFromIfaceName(const string& ifaceName, string& ifaceIpAdress, bool isIpV6)
 {
   ifaceIpAdress = "";
   if (!ifaceName.size())
-  {
-    return -1;
-  }
-
-  int fd = createSocket(isIpV6);
-  if (-1 == fd)
   {
     return -1;
   }
@@ -80,7 +74,6 @@ int createSocketFromIfaceName(const string& ifaceName, string& ifaceIpAdress, bo
         {
           LOG_ERROR("Error getting IPv6 address for " << ifaceName << ": "
                       << gai_strerror(getnameErrCode));
-          close(fd);
           return -1;
         }
       }
@@ -100,7 +93,6 @@ int createSocketFromIfaceName(const string& ifaceName, string& ifaceIpAdress, bo
         {
           LOG_ERROR("Error getting IP address for " << ifaceName << ": "
               << gai_strerror(getnameErrCode));
-          close(fd);
           return -1;
         }
       }
@@ -110,11 +102,10 @@ int createSocketFromIfaceName(const string& ifaceName, string& ifaceIpAdress, bo
   // Make sure iface ip address has to be found, which means iface name is valid
   if (!ifaceIpAdress.length())
   {
-    close(fd);
     return -1;
   }
 
-  return fd;
+  return 0;
 }
 
 const string& IfaceData::toString() const
@@ -165,16 +156,10 @@ void setDebugMode(bool enable)
   g_debugMode = enable;
 }
 
-int createSocketFromIfaceAddress(const string& ifaceIpAddress, string& ifaceName, bool isIpV6)
+int getIfaceNameFromIfaceAddress(const string& ifaceIpAddress, string& ifaceName, bool isIpV6)
 {
   ifaceName = "";
   if (!ifaceIpAddress.length())
-  {
-    return -1;
-  }
-
-  int fd = createSocket(isIpV6);
-  if (-1 == fd)
   {
     return -1;
   }
@@ -214,7 +199,6 @@ int createSocketFromIfaceAddress(const string& ifaceIpAddress, string& ifaceName
       {
         LOG_ERROR( "Error getting interface name for "
                       << ifaceIpAddress << ": " << gai_strerror(getnameErrCode));
-        close(fd);
         return -1;
       }
     }
@@ -234,7 +218,6 @@ int createSocketFromIfaceAddress(const string& ifaceIpAddress, string& ifaceName
       {
         LOG_ERROR( "Error getting interface name for "
                       << ifaceIpAddress << ": " << gai_strerror(getnameErrCode));
-        close(fd);
         return -1;
       }
     }
@@ -243,11 +226,10 @@ int createSocketFromIfaceAddress(const string& ifaceIpAddress, string& ifaceName
   // Make sure iface ip address has to be found, which means iface name is valid
   if (!ifaceName.length())
   {
-    close(fd);
     return -1;
   }
 
-  return fd;
+  return 0;
 }
 
 bool isDebugMode()
