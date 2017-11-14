@@ -22,8 +22,16 @@ private:
    * @param fd        - udp socket that needs binding
    * @param ifaceName - name of interface
    */
-  bool setMcastIface(int fd, const char* ifaceName);
-  bool setMcastV6Iface(int fd, const char* ifaceName);
+  bool setMcastWithIfaceName(int fd, const char* ifaceName);
+  bool setMcastWithV6IfaceName(int fd, const char* ifaceName);
+
+  /**
+   * Similar to setMcastWithIfaceName but using interface IP address instead
+   *
+   * @param fd            - udp socket that needs binding
+   * @param ifaceAddress  - IP address of interface
+   */
+  bool setMcastWithIfaceAddress(int fd, const char* ifaceAddress);
 
 private:
   bool mIsLoopBackOn;

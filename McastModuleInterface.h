@@ -27,20 +27,19 @@ protected:
   int mMcastPort;
 
 private:
-  int mSin_Family;
+  bool mIsIpV6;
 };
 
 inline McastModuleInterface::McastModuleInterface(const vector<IfaceData>& ifaces,
     const string& mcastAddress, int mcastPort, bool useIpV6) :
-    mIfaces(ifaces), mMcastAddress(mcastAddress), mMcastPort(mcastPort)
+    mIfaces(ifaces), mMcastAddress(mcastAddress), mMcastPort(mcastPort), mIsIpV6(useIpV6)
 {
   string ipVer = (useIpV6)? "IPV6" : "IPV4";
   cout << "MCAST with " << ipVer << " " << mcastAddress << " port " << mcastPort << endl;
-  mSin_Family = (useIpV6)? AF_INET6 : AF_INET;
 }
 
 inline bool McastModuleInterface::isIpV6() const
 {
-  return (mSin_Family == AF_INET6);
+  return mIsIpV6;
 }
 #endif /* MCAST_TOOL_MCASTMODULEINTERFACE_H_ */

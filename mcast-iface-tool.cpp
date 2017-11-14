@@ -136,16 +136,33 @@ int main(int argc, char** argv)
    */
   for (int i = optind; i < argc; ++i)
   {
-    const string ifaceName = argv[i];
-    string ifaceAddress;
-    int fd = createSocketFromIfaceName(ifaceName, ifaceAddress, useIPv6);
+    const string iface = argv[i];
+    string ifaceAddress, ifaceName;
+    bool useIPAddress = false;
+    int fd = -1;
+
+    // force using IP address
+    if (isValidIpAddress(iface.c_str(), useIPv6))
+    {
+      ifaceAddress = iface;
+      useIPAddress = true;
+      fd = createSocketFromIfaceAddress(ifaceAddress, ifaceName, useIPv6);
+    }
+    else
+    {
+      // use interface name
+      ifaceName = iface;
+      useIPAddress = false;
+      fd = createSocketFromIfaceName(ifaceName, ifaceAddress, useIPv6);
+    }
+
     if (-1 == fd)
     {
-      LOG_ERROR("Can't find ip address for " << ifaceName);
+      LOG_ERROR("Can't find ip address or interface name for " << iface);
       safeExit(1);
     }
 
-    g_ifaces.push_back((IfaceData(ifaceName, ifaceAddress, fd)));
+    g_ifaces.push_back((IfaceData(ifaceName, ifaceAddress, fd, useIPAddress)));
   }
 
   if (0 == g_ifaces.size())

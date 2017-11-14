@@ -13,6 +13,7 @@ Therefore, may I introduce you mcastit: a network tool that specializes in netwo
  * IPv4 & IPv6
  * Multicast sender with/without loopback
  * Multiple network interface support
+ * Multiple interface IP address support (IPv4 only)
 
 
 ### Usage
@@ -29,28 +30,30 @@ Therefore, may I introduce you mcastit: a network tool that specializes in netwo
     -h                 This message
 ```
 ### Examples
-Sender on interface docker0 & wlp4s0 for multicast address 224.1.1.1 port 12321:
+Sender on interface docker0 & 192.168.0.12 for multicast address 224.1.1.1 port 12321:
 ```
-./mcastit -m 224.1.1.1 -p 12321 wlp4s0 docker0
+./mcastit -m 224.1.1.1 -p 12321 192.168.0.12 docker0
 MCAST with IPV4 224.1.1.1 port 12321
 Sending with loopback
 ==============================================================
-[OK] sent to [wlp4s0 (192.168.0.7)] bytes: 36
+[OK] sent to [192.168.0.12 (wlp4s0)] bytes: 37
 [OK] sent to [docker0 (172.17.0.1)] bytes: 36
+
 ```
 
-Listener on interface docker0 & wlp4s0 for multicast address 224.1.1.1 port 12321:
+Listener on interface 172.17.0.1 & wlp4s0 for multicast address 224.1.1.1 port 12321:
 ```
-./mcastit -l -m 224.1.1.1 -p 12321 wlp4s0 docker0
+./mcastit -l -m 224.1.1.1 -p 12321 wlp4s0 172.17.0.1
 MCAST with IPV4 224.1.1.1 port 12321
 Listening ...
-Interface wlp4s0 (192.168.0.7) [OK]
-Interface docker0 (172.17.0.1) [OK]
+Interface wlp4s0 (192.168.0.12) [OK]
+Interface 172.17.0.1 (docker0) [OK]
 ==============================================================
-192.168.0.7 ->    wlp4s0: <Sender info: wlp4s0 (192.168.0.7)>
-192.168.0.7 ->   docker0: <Sender info: wlp4s0 (192.168.0.7)>
+192.168.0.12 ->    wlp4s0: <Sender info: 192.168.0.12 (wlp4s0)>
+192.168.0.12 ->   docker0: <Sender info: 192.168.0.12 (wlp4s0)>
 172.17.0.1 ->    wlp4s0: <Sender info: docker0 (172.17.0.1)>
 172.17.0.1 ->   docker0: <Sender info: docker0 (172.17.0.1)>
+
 ```
 
 ## Other useful multicast related tools

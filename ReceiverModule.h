@@ -25,6 +25,16 @@ private:
     */
    int joinMcastIface(int sock, const char* ifaceName = "");
    int joinMcastIfaceV6(int sock, const char* ifaceName = "");
+
+   /**
+    * Similar to joinMcastIface but bind to interface IP address instead of
+    * interface name
+    *
+    * @param sock             - sock fd to join
+    * @param ifaceIpAddress   - interface IP address
+    * @return 0 on success
+    */
+   int joinMcastIfaceAddress(int sock, const char* ifaceIpAddress = "");
 };
 
 #endif /* MCAST_TOOL_MCASTRECEIVERMODULE_H_ */

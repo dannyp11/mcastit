@@ -47,10 +47,11 @@ struct IfaceData
   int sockFd;
   string ifaceName;
   string ifaceAddress;
+  bool mustUseIPAddress;
 
-  IfaceData(): sockFd(-1), ifaceName(""), ifaceAddress("") {}
-  IfaceData(const string& name, const string& address, int fd = -1):
-    sockFd(fd), ifaceName(name), ifaceAddress(address) {}
+  IfaceData(): sockFd(-1), ifaceName(""), ifaceAddress(""), mustUseIPAddress(false) {}
+  IfaceData(const string& name, const string& address, int fd = -1, bool useIPAddress = false):
+    sockFd(fd), ifaceName(name), ifaceAddress(address), mustUseIPAddress(useIPAddress) {}
 
   const string& getReadableName() const;
   const string& getReadableAddress() const;
@@ -71,6 +72,16 @@ private:
 int createSocketFromIfaceName(const string& ifaceName, string& ifaceIpAdress, bool isIpV6 = false);
 
 /**
+ * Similar to createSocketFromIfaceName but use interface IP address as input
+ *
+ * @param ifaceIpAddress  - [IN] has to be nonzero length
+ * @param ifaceName       - [OUT] resolved interface name
+ * @param isIpV6          - true if create ipv6 socket
+ * @return the socket created by getting the info, -1 if error
+ */
+int createSocketFromIfaceAddress(const string& ifaceIpAddress, string& ifaceName, bool isIpV6 = false);
+
+/**
  * Create udp socket
  *
  * @param isIpV6
@@ -88,5 +99,10 @@ void cleanupCommon();
  */
 void setDebugMode(bool enable = true);
 bool isDebugMode();
+
+/**
+ * Determine if string is an IP address
+ */
+bool isValidIpAddress(const char *ipAddress, bool useIpV6 = false);
 
 #endif /*COMMON_H_*/

@@ -6,6 +6,26 @@
 static struct ifaddrs *g_ifap;
 static bool g_debugMode = false;
 
+/**
+ * Init g_ifap
+ * @return 0 on success
+ */
+static int init_Ifap()
+{
+  bool alreadyRan = false;
+  static int retVal = -1;
+  if (!alreadyRan)
+  {
+    alreadyRan = true;
+    if (0 != (retVal = getifaddrs(&g_ifap)))
+    {
+      LOG_ERROR("Can't get system interfaces: " << strerror(errno));
+    }
+  }
+
+  return retVal;
+}
+
 int createSocket(bool isIpV6)
 {
   int sockFamily = (isIpV6) ? AF_INET6 : AF_INET;
@@ -29,15 +49,9 @@ int createSocketFromIfaceName(const string& ifaceName, string& ifaceIpAdress, bo
   /*
    * Now get interface ip address from interface name
    */
-  static bool alreadyHasIfap = false;
-  if (!alreadyHasIfap)
+  if (0 != init_Ifap())
   {
-    if (0 != getifaddrs(&g_ifap))
-    {
-      LOG_ERROR("Can't get system interfaces: " << strerror(errno));
-      return -1;
-    }
-    alreadyHasIfap = true;
+    return -1;
   }
 
   char addr[INET6_ADDRSTRLEN];
@@ -108,7 +122,14 @@ const string& IfaceData::toString() const
   static string result;
   std::stringstream stm;
 
-  stm << getReadableName() << " (" << getReadableAddress() << ")";
+  if (mustUseIPAddress)
+  {
+    stm << getReadableAddress() << " (" << getReadableName() << ")";
+  }
+  else
+  {
+    stm << getReadableName() << " (" << getReadableAddress() << ")";
+  }
   result = stm.str();
   return result;
 }
@@ -144,7 +165,110 @@ void setDebugMode(bool enable)
   g_debugMode = enable;
 }
 
+int createSocketFromIfaceAddress(const string& ifaceIpAddress, string& ifaceName, bool isIpV6)
+{
+  ifaceName = "";
+  if (!ifaceIpAddress.length())
+  {
+    return -1;
+  }
+
+  int fd = createSocket(isIpV6);
+  if (-1 == fd)
+  {
+    return -1;
+  }
+
+  /*
+   * Now get interface ip address from interface name
+   */
+  if (0 != init_Ifap())
+  {
+    return -1;
+  }
+
+  char addr[INET6_ADDRSTRLEN];
+  int getnameErrCode;
+
+  for (struct ifaddrs* ifa = g_ifap; ifa; ifa = ifa->ifa_next)
+  {
+    // make sure ifa_addr is valid
+    if (!ifa->ifa_addr)
+    {
+      continue;
+    }
+
+    // Check ipv6 interface
+    if (isIpV6 && ifa->ifa_addr->sa_family == AF_INET6)
+    {
+      if (0 == (getnameErrCode = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in6),
+                                           addr, sizeof(addr), NULL, 0, NI_NUMERICHOST)))
+      {
+        if (ifaceIpAddress == addr)
+        {
+          ifaceName = ifa->ifa_name;
+          break;
+        }
+      }
+      else
+      {
+        LOG_ERROR( "Error getting interface name for "
+                      << ifaceIpAddress << ": " << gai_strerror(getnameErrCode));
+        close(fd);
+        return -1;
+      }
+    }
+    // check ipv4 interface
+    else if (!isIpV6 && ifa->ifa_addr->sa_family == AF_INET)
+    {
+      if (0 == (getnameErrCode = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in),
+                                            addr, sizeof(addr), NULL, 0, NI_NUMERICHOST)))
+      {
+        if (ifaceIpAddress == addr)
+        {
+          ifaceName = ifa->ifa_name;
+          break;
+        }
+      }
+      else
+      {
+        LOG_ERROR( "Error getting interface name for "
+                      << ifaceIpAddress << ": " << gai_strerror(getnameErrCode));
+        close(fd);
+        return -1;
+      }
+    }
+  }
+
+  // Make sure iface ip address has to be found, which means iface name is valid
+  if (!ifaceName.length())
+  {
+    close(fd);
+    return -1;
+  }
+
+  return fd;
+}
+
 bool isDebugMode()
 {
   return g_debugMode;
+}
+
+bool isValidIpAddress(const char *ipAddress, bool useIpV6)
+{
+  int result = 0;
+
+  if (!useIpV6)
+  {
+    struct sockaddr_in sa;
+    result = inet_pton(AF_INET, ipAddress, &(sa.sin_addr));
+  }
+  else
+  {
+    struct sockaddr_in6 sa6;
+    result = inet_pton(AF_INET6, ipAddress, &(sa6.sin6_addr));
+  }
+
+  return result != 0;
 }
