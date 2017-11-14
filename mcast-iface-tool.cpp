@@ -37,7 +37,7 @@ static void cleanup()
   delete g_McastModule;
   for (unsigned i = 0; i < g_ifaces.size(); ++i)
   {
-    int fd = g_ifaces[i].sockFd;
+    int& fd = g_ifaces[i].sockFd;
     if (fd >= 0 && (0 != close(fd)))
     {
       LOG_ERROR("Close socket " << fd << ": " << strerror(errno));
