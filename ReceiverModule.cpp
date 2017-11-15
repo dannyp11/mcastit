@@ -96,14 +96,13 @@ bool ReceiverModule::run()
       }
 
       int8_t buffer[MCAST_BUFF_LEN];
-      uint32_t rbuffsz = sizeof(buffer);
 
       // get sender data
       struct sockaddr_storage sender;
       socklen_t sendsize = sizeof(sender);
       bzero(&sender, sizeof(sender));
 
-      if (0 > recvfrom(fd, buffer, rbuffsz, 0, (struct sockaddr*) &sender, &sendsize))
+      if (0 > recvfrom(fd, buffer, sizeof(buffer), 0, (struct sockaddr*) &sender, &sendsize))
       {
         LOG_ERROR("recvfrom " << ifaceData << ": " << strerror(errno));
         continue;
@@ -123,7 +122,7 @@ bool ReceiverModule::run()
       }
 
       // print result message
-      printf("%s: %s\n", senderIp, buffer);
+      printf("%s - %s\n", senderIp, buffer);
 
       // rm fd so that it's not processed again
       FD_CLR(fd, &rfds);

@@ -3,24 +3,68 @@
 #define DEFAULT_IP_ADDRESS  "0.0.0.0"
 #define DEFAULT_IFACE       "default"
 
-static struct ifaddrs *g_ifap;
+/**
+ * Maps contain all interface data
+ * These maps should only be populated once
+ */
+static map<string, string> g_if4_name2ip_map;
+static map<string, string> g_if4_ip2name_map;
+static map<string, string> g_if6_name2ip_map;
+static map<string, string> g_if6_ip2name_map;
+
 static bool g_debugMode = false;
 
 /**
  * Init g_ifap
  * @return 0 on success
  */
-static int init_Ifap()
+static int common_init()
 {
   bool alreadyRan = false;
   static int retVal = -1;
   if (!alreadyRan)
   {
     alreadyRan = true;
-    if (0 != (retVal = getifaddrs(&g_ifap)))
+    struct ifaddrs *ifap;
+    if (0 != (retVal = getifaddrs(&ifap)))
     {
       LOG_ERROR("Can't get system interfaces: " << strerror(errno));
     }
+
+    // populate all the maps
+    char ipAddr[INET6_ADDRSTRLEN];
+    int getnameErrCode;
+    for (struct ifaddrs* ifa = ifap; ifa; ifa = ifa->ifa_next)
+    {
+      // make sure ifa_addr is valid
+      if (!ifa->ifa_addr)
+      {
+        continue;
+      }
+
+      // Check ipv6 interface
+      if (ifa->ifa_addr->sa_family == AF_INET6)
+      {
+        if (0 == (getnameErrCode = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in6), ipAddr,
+                                                sizeof(ipAddr), NULL, 0, NI_NUMERICHOST)))
+        {
+          g_if6_ip2name_map[ipAddr] = ifa->ifa_name;
+          g_if6_name2ip_map[ifa->ifa_name] = ipAddr;
+        }
+      }
+      // check ipv4 interface
+      else if (ifa->ifa_addr->sa_family == AF_INET)
+      {
+        if (0 == (getnameErrCode = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in), ipAddr,
+                                                sizeof(ipAddr), NULL, 0, NI_NUMERICHOST)))
+        {
+          g_if4_ip2name_map[ipAddr] = ifa->ifa_name;
+          g_if4_name2ip_map[ifa->ifa_name] = ipAddr;
+        }
+      }
+    }
+
+    freeifaddrs(ifap);
   }
 
   return retVal;
@@ -43,59 +87,24 @@ int getIfaceIPFromIfaceName(const string& ifaceName, string& ifaceIpAdress, bool
   /*
    * Now get interface ip address from interface name
    */
-  if (0 != init_Ifap())
+  if (0 != common_init())
   {
     return -1;
   }
 
-  char addr[INET6_ADDRSTRLEN];
-  int getnameErrCode;
-
-  for (struct ifaddrs* ifa = g_ifap; ifa; ifa = ifa->ifa_next)
+  // retrieve ip address from global maps
+  if (isIpV6)
   {
-    // make sure ifa_addr is valid
-    if (!ifa->ifa_addr)
+    if (g_if6_name2ip_map.end() != g_if6_name2ip_map.find(ifaceName))
     {
-      continue;
+      ifaceIpAdress = g_if6_name2ip_map[ifaceName];
     }
-
-    // Check ipv6 interface
-    if (isIpV6 && ifa->ifa_addr->sa_family == AF_INET6)
+  }
+  else
+  {
+    if (g_if4_name2ip_map.end() != g_if4_name2ip_map.find(ifaceName))
     {
-      if (ifaceName == ifa->ifa_name)
-      {
-        if (0 == (getnameErrCode = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in6),
-                                          addr, sizeof(addr), NULL, 0, NI_NUMERICHOST)))
-        {
-          ifaceIpAdress = addr;
-          break;
-        }
-        else
-        {
-          LOG_ERROR("Error getting IPv6 address for " << ifaceName << ": "
-                      << gai_strerror(getnameErrCode));
-          return -1;
-        }
-      }
-    }
-    // check ipv4 interface
-    else if (!isIpV6 && ifa->ifa_addr->sa_family == AF_INET)
-    {
-      if (ifaceName == ifa->ifa_name)
-      {
-        if (0 == (getnameErrCode = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in), addr,
-                sizeof(addr), NULL, 0, NI_NUMERICHOST)))
-        {
-          ifaceIpAdress = addr;
-          break;
-        }
-        else
-        {
-          LOG_ERROR("Error getting IP address for " << ifaceName << ": "
-              << gai_strerror(getnameErrCode));
-          return -1;
-        }
-      }
+      ifaceIpAdress = g_if4_name2ip_map[ifaceName];
     }
   }
 
@@ -148,7 +157,6 @@ std::ostream & operator<<(std::ostream &os, const IfaceData& iface)
 
 void cleanupCommon()
 {
-  freeifaddrs(g_ifap);
 }
 
 void setDebugMode(bool enable)
@@ -167,59 +175,24 @@ int getIfaceNameFromIfaceAddress(const string& ifaceIpAddress, string& ifaceName
   /*
    * Now get interface ip address from interface name
    */
-  if (0 != init_Ifap())
+  if (0 != common_init())
   {
     return -1;
   }
 
-  char addr[INET6_ADDRSTRLEN];
-  int getnameErrCode;
-
-  for (struct ifaddrs* ifa = g_ifap; ifa; ifa = ifa->ifa_next)
+  // retrieve iface name from global maps
+  if (isIpV6)
   {
-    // make sure ifa_addr is valid
-    if (!ifa->ifa_addr)
+    if (g_if6_ip2name_map.end() != g_if6_ip2name_map.find(ifaceIpAddress))
     {
-      continue;
+      ifaceName = g_if6_ip2name_map[ifaceIpAddress];
     }
-
-    // Check ipv6 interface
-    if (isIpV6 && ifa->ifa_addr->sa_family == AF_INET6)
+  }
+  else
+  {
+    if (g_if4_ip2name_map.end() != g_if4_ip2name_map.find(ifaceIpAddress))
     {
-      if (0 == (getnameErrCode = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in6),
-                                           addr, sizeof(addr), NULL, 0, NI_NUMERICHOST)))
-      {
-        if (ifaceIpAddress == addr)
-        {
-          ifaceName = ifa->ifa_name;
-          break;
-        }
-      }
-      else
-      {
-        LOG_ERROR( "Error getting interface name for "
-                      << ifaceIpAddress << ": " << gai_strerror(getnameErrCode));
-        return -1;
-      }
-    }
-    // check ipv4 interface
-    else if (!isIpV6 && ifa->ifa_addr->sa_family == AF_INET)
-    {
-      if (0 == (getnameErrCode = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in),
-                                            addr, sizeof(addr), NULL, 0, NI_NUMERICHOST)))
-      {
-        if (ifaceIpAddress == addr)
-        {
-          ifaceName = ifa->ifa_name;
-          break;
-        }
-      }
-      else
-      {
-        LOG_ERROR( "Error getting interface name for "
-                      << ifaceIpAddress << ": " << gai_strerror(getnameErrCode));
-        return -1;
-      }
+      ifaceName = g_if4_ip2name_map[ifaceIpAddress];
     }
   }
 

@@ -9,6 +9,7 @@
 #include <error.h>
 #include <vector>
 #include <set>
+#include <map>
 #include <iostream>
 #include <signal.h>
 #include <execinfo.h>
@@ -32,6 +33,7 @@ using std::cout;
 using std::endl;
 using std::vector;
 using std::set;
+using std::map;
 
 #define MCAST_BUFF_LEN    (1024)  // message length
 
