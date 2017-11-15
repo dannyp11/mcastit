@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <error.h>
 #include <vector>
+#include <set>
 #include <iostream>
 #include <signal.h>
 #include <execinfo.h>
@@ -30,6 +31,7 @@ using std::string;
 using std::cout;
 using std::endl;
 using std::vector;
+using std::set;
 
 #define MCAST_BUFF_LEN    (1024)  // message length
 

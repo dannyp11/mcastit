@@ -35,18 +35,21 @@ static void usage(int /*argc*/, char * argv[])
 static void cleanup()
 {
   delete g_McastModule;
+  set<int> uniqueFdSet;
   for (unsigned i = 0; i < g_ifaces.size(); ++i)
   {
-    int& fd = g_ifaces[i].sockFd;
-    if (fd >= 0 && (0 != close(fd)))
+    uniqueFdSet.insert(g_ifaces[i].sockFd);
+  }
+  
+  for (set<int>::const_iterator setIt = uniqueFdSet.begin(); 
+            setIt != uniqueFdSet.end(); ++setIt)
+  {
+    if (-1 == close(*setIt))
     {
-      LOG_ERROR("Close socket " << fd << ": " << strerror(errno));
-    }
-    else
-    {
-      fd = -1;
+      LOG_ERROR("Close socket " << *setIt << ": " << strerror(errno));
     }
   }
+  
   cleanupCommon();
 }
 
