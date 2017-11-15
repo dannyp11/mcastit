@@ -27,7 +27,7 @@ static void usage(int /*argc*/, char * argv[])
 
       << "    -l                 listen mode" << endl
       << "    -o                 turn off loop back on sender" << endl
-      << "    -h                 This message" << std::endl << endl;
+      << "    -h                 This message, (version " __DATE__ << " " << __TIME__ << ")" << endl << endl;
 
   exit(1);
 }
