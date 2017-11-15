@@ -22,14 +22,7 @@ bool SenderModule::run()
     }
     else
     {
-      if (mIfaces[i].mustUseIPAddress)
-      {
-        setMcastOk = setMcastWithIfaceAddress(mIfaces[i].sockFd, mIfaces[i].ifaceAddress.c_str());
-      }
-      else
-      {
-        setMcastOk = setMcastWithIfaceName(mIfaces[i].sockFd, mIfaces[i].ifaceName.c_str());
-      }
+      setMcastOk = setMcastWithIfaceName(mIfaces[i].sockFd, mIfaces[i].ifaceName.c_str());
     }
 
     if (!setMcastOk)
@@ -185,50 +178,6 @@ bool SenderModule::setMcastWithV6IfaceName(int fd, const char* ifaceName)
     {
       LOG_ERROR("sockopt IPV6_MULTICAST_IF: " << strerror(errno));
       return false;
-    }
-  }
-
-  return true;
-}
-
-bool SenderModule::setMcastWithIfaceAddress(int fd, const char* ifaceAddress)
-{
-  // Set the TTL hop count
-  int opt = 6;
-  int res = setsockopt(fd, IPPROTO_IP, IP_MULTICAST_TTL, (void*) &opt, sizeof(opt));
-  if (0 > res)
-  {
-    LOG_ERROR("sockopt TTL: " << strerror(errno));
-    return false;
-  }
-
-  // Allow broadcast on this socket.
-  opt = 1;
-  res = setsockopt(fd, SOL_SOCKET, SO_BROADCAST, (void*) &opt, sizeof(opt));
-  if (0 > res)
-  {
-    LOG_ERROR("sockopt SO_BROADCAST: " << strerror(errno));
-    return false;
-  }
-
-  // Enable loop back if set.
-  opt = mIsLoopBackOn;
-  res = setsockopt(fd, IPPROTO_IP, IP_MULTICAST_LOOP, (void*) &opt, sizeof(opt));
-  if (0 > res)
-  {
-    LOG_ERROR("sockopt IP_MULTICAST_LOOP: " << strerror(errno));
-    return false;
-  }
-
-  // If iface name specified, set iface name for the socket
-  if (0 < strlen(ifaceAddress))
-  {
-    struct ip_mreq ifaddr;
-    memset(&ifaddr, 0, sizeof(ifaddr));
-    ifaddr.imr_interface.s_addr = inet_addr(ifaceAddress);
-    if (0 != (res = setsockopt(fd, IPPROTO_IP, IP_MULTICAST_IF, &ifaddr, sizeof(ifaddr))))
-    {
-      LOG_ERROR("sockopt IP_MULTICAST_IF: " << strerror(errno));
     }
   }
 

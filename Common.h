@@ -51,11 +51,10 @@ struct IfaceData
   int sockFd;
   string ifaceName;
   string ifaceAddress;
-  bool mustUseIPAddress;
 
-  IfaceData(): sockFd(-1), ifaceName(""), ifaceAddress(""), mustUseIPAddress(false) {}
-  IfaceData(const string& name, const string& address, int fd = -1, bool useIPAddress = false):
-    sockFd(fd), ifaceName(name), ifaceAddress(address), mustUseIPAddress(useIPAddress) {}
+  IfaceData(): sockFd(-1), ifaceName(""), ifaceAddress("") {}
+  IfaceData(const string& name, const string& address, int fd = -1):
+    sockFd(fd), ifaceName(name), ifaceAddress(address) {}
 
   const string& getReadableName() const;
   const string& getReadableAddress() const;

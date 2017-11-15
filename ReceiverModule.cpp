@@ -22,16 +22,7 @@ bool ReceiverModule::run()
     }
     else
     {
-      if (mIfaces[i].mustUseIPAddress)
-      {
-        // join using IP address
-        setOk = joinMcastIfaceAddress(fd, mIfaces[i].ifaceAddress.c_str());
-      }
-      else
-      {
-        // join using interface name
-        setOk = joinMcastIface(fd, mIfaces[i].ifaceName.c_str());
-      }
+      setOk = joinMcastIface(fd, mIfaces[i].ifaceName.c_str());
     }
 
     if (setOk != 0)
@@ -244,64 +235,6 @@ int ReceiverModule::joinMcastIfaceV6(int sock, const char* ifaceName)
   {
     printf("ERR: join mcast GRP<%s> INF<%s> ERR<%s>\n", mMcastAddress.c_str(), ifaceName,
         strerror(errno));
-  }
-
-  return res;
-}
-
-int ReceiverModule::joinMcastIfaceAddress(int sock, const char* ifaceIpAddress)
-{
-  // Set the recv buffer size.
-  int res;
-  uint32_t buffSz = MCAST_BUFF_LEN;
-  res = setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &buffSz, sizeof(buffSz));
-  if (0 > res)
-  {
-    LOG_ERROR("joinMcastIfaceAddress sockopt BuffSz: " << strerror(errno));
-    return -1;
-  }
-
-  // Let's set reuse port to on to allow multiple binds per host.
-  int opt = 1;
-  res = setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-  if (0 > res)
-  {
-    LOG_ERROR("joinMcastIfaceAddress sockopt SO_REUSEADDR: " << strerror(errno));
-    return -1;
-  }
-
-  // Bind the socket to the multicast port.
-  struct sockaddr_in bindAddr;
-  memset(&bindAddr, 0, sizeof(bindAddr));
-  bindAddr.sin_family = AF_INET;
-  bindAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-  bindAddr.sin_port = htons(mMcastPort);
-  res = ::bind(sock, (struct sockaddr *) &bindAddr, sizeof(bindAddr));
-  if (0 > res && errno != EINVAL)
-    // ignore EINVAL for allowing multiple mcast interfaces in same socket
-  {
-    LOG_ERROR("joinMcastIfaceAddress bind: " << strerror(errno));
-    return -1;
-  }
-
-  // If ifaceIpAddress is specified, bind directly to that IP,
-  // otherwise bind to general interface
-  struct ip_mreq mcastReq;
-  if (0 == strlen(ifaceIpAddress))
-  {
-    mcastReq.imr_interface.s_addr = htonl(INADDR_ANY);
-  }
-  else
-  {
-    mcastReq.imr_interface.s_addr = inet_addr(ifaceIpAddress);
-  }
-
-  mcastReq.imr_multiaddr.s_addr = inet_addr(mMcastAddress.c_str());
-  res = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void*) &mcastReq, sizeof(mcastReq));
-  if (0 != res)
-  {
-    printf("Error: join mcast group<%s> interface<%s>: %s\n",
-              mMcastAddress.c_str(), ifaceIpAddress, strerror(errno));
   }
 
   return res;

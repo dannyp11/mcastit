@@ -144,9 +144,8 @@ int main(int argc, char** argv)
   int fd = -1;
   for (int i = optind; i < argc; ++i)
   {
-    const string iface = argv[i];
-    string ifaceAddress, ifaceName;
-    bool useIPAddress = false;
+    const string ifaceName = argv[i];
+    string ifaceAddress;
     if (!listenMode || i == optind)
     {
       fd = createSocket(useIPv6);
@@ -154,34 +153,18 @@ int main(int argc, char** argv)
 
     if (-1 == fd)
     {
-      LOG_ERROR("Can't create socket for " << iface);
+      LOG_ERROR("Can't create socket for " << ifaceName);
       safeExit(1);
     }
 
-    // force using IP address
-    if (isValidIpAddress(iface.c_str(), useIPv6))
+    // use interface name
+    if (0 != getIfaceIPFromIfaceName(ifaceName, ifaceAddress, useIPv6))
     {
-      ifaceAddress = iface;
-      useIPAddress = true;
-      if (0 != getIfaceNameFromIfaceAddress(ifaceAddress, ifaceName, useIPv6))
-      {
-        LOG_ERROR("Can't find interface name for " << ifaceAddress);
-        safeExit(2);
-      }
-    }
-    else
-    {
-      // use interface name
-      ifaceName = iface;
-      useIPAddress = false;
-      if (0 != getIfaceIPFromIfaceName(ifaceName, ifaceAddress, useIPv6))
-      {
-        LOG_ERROR("Can't find interface IP address for " << ifaceName);
-        safeExit(2);
-      }
+      LOG_ERROR("Can't find interface IP address for " << ifaceName);
+      safeExit(2);
     }
 
-    g_ifaces.push_back((IfaceData(ifaceName, ifaceAddress, fd, useIPAddress)));
+    g_ifaces.push_back((IfaceData(ifaceName, ifaceAddress, fd)));
   }
 
   if (0 == g_ifaces.size())

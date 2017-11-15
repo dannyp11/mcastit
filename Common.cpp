@@ -8,9 +8,7 @@
  * These maps should only be populated once
  */
 static map<string, string> g_if4_name2ip_map;
-static map<string, string> g_if4_ip2name_map;
 static map<string, string> g_if6_name2ip_map;
-static map<string, string> g_if6_ip2name_map;
 
 static bool g_debugMode = false;
 
@@ -32,8 +30,9 @@ static int common_init()
     }
 
     // populate all the maps
+    g_if4_name2ip_map.clear();
+    g_if6_name2ip_map.clear();
     char ipAddr[INET6_ADDRSTRLEN];
-    int getnameErrCode;
     for (struct ifaddrs* ifa = ifap; ifa; ifa = ifa->ifa_next)
     {
       // make sure ifa_addr is valid
@@ -45,20 +44,18 @@ static int common_init()
       // Check ipv6 interface
       if (ifa->ifa_addr->sa_family == AF_INET6)
       {
-        if (0 == (getnameErrCode = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in6), ipAddr,
-                                                sizeof(ipAddr), NULL, 0, NI_NUMERICHOST)))
+        if (0 == getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in6), ipAddr,
+                                                sizeof(ipAddr), NULL, 0, NI_NUMERICHOST))
         {
-          g_if6_ip2name_map[ipAddr] = ifa->ifa_name;
           g_if6_name2ip_map[ifa->ifa_name] = ipAddr;
         }
       }
       // check ipv4 interface
       else if (ifa->ifa_addr->sa_family == AF_INET)
       {
-        if (0 == (getnameErrCode = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in), ipAddr,
-                                                sizeof(ipAddr), NULL, 0, NI_NUMERICHOST)))
+        if (0 == getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in), ipAddr,
+                                                sizeof(ipAddr), NULL, 0, NI_NUMERICHOST))
         {
-          g_if4_ip2name_map[ipAddr] = ifa->ifa_name;
           g_if4_name2ip_map[ifa->ifa_name] = ipAddr;
         }
       }
@@ -121,15 +118,7 @@ const string& IfaceData::toString() const
 {
   static string result;
   std::stringstream stm;
-
-  if (mustUseIPAddress)
-  {
-    stm << getReadableAddress() << " (" << getReadableName() << ")";
-  }
-  else
-  {
-    stm << getReadableName() << " (" << getReadableAddress() << ")";
-  }
+  stm << getReadableName() << " (" << getReadableAddress() << ")";
   result = stm.str();
   return result;
 }
@@ -164,66 +153,7 @@ void setDebugMode(bool enable)
   g_debugMode = enable;
 }
 
-int getIfaceNameFromIfaceAddress(const string& ifaceIpAddress, string& ifaceName, bool isIpV6)
-{
-  ifaceName = "";
-  if (!ifaceIpAddress.length())
-  {
-    return -1;
-  }
-
-  /*
-   * Now get interface ip address from interface name
-   */
-  if (0 != common_init())
-  {
-    return -1;
-  }
-
-  // retrieve iface name from global maps
-  if (isIpV6)
-  {
-    if (g_if6_ip2name_map.end() != g_if6_ip2name_map.find(ifaceIpAddress))
-    {
-      ifaceName = g_if6_ip2name_map[ifaceIpAddress];
-    }
-  }
-  else
-  {
-    if (g_if4_ip2name_map.end() != g_if4_ip2name_map.find(ifaceIpAddress))
-    {
-      ifaceName = g_if4_ip2name_map[ifaceIpAddress];
-    }
-  }
-
-  // Make sure iface ip address has to be found, which means iface name is valid
-  if (!ifaceName.length())
-  {
-    return -1;
-  }
-
-  return 0;
-}
-
 bool isDebugMode()
 {
   return g_debugMode;
-}
-
-bool isValidIpAddress(const char *ipAddress, bool useIpV6)
-{
-  int result = 0;
-
-  if (!useIpV6)
-  {
-    struct sockaddr_in sa;
-    result = inet_pton(AF_INET, ipAddress, &(sa.sin_addr));
-  }
-  else
-  {
-    struct sockaddr_in6 sa6;
-    result = inet_pton(AF_INET6, ipAddress, &(sa6.sin6_addr));
-  }
-
-  return result != 0;
 }
