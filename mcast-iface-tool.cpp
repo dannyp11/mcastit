@@ -5,9 +5,7 @@
 // Global vars
 #define DEFAULT_MCAST_ADDRESS_V4  "239.192.0.123"
 #define DEFAULT_MCAST_ADDRESS_V6  "FFFE::1:FF47:0"
-
-static int g_McastPort = 12321;
-static string g_McastAddress = DEFAULT_MCAST_ADDRESS_V4;
+#define DEFAULT_MCAST_PORT        (12321)
 
 static vector<IfaceData> g_ifaces;
 static McastModuleInterface* g_McastModule = NULL;
@@ -22,8 +20,8 @@ static void usage(int /*argc*/, char * argv[])
       << "    Option:" << endl
       << "    -6                 use IPv6" << endl
       << "    -m {mcast address} multicast address, default: " << DEFAULT_MCAST_ADDRESS_V4
-                                                        << " and " << DEFAULT_MCAST_ADDRESS_V6 << "(v6)" << endl
-      << "    -p {port}          multicast port, default: " << g_McastPort << endl << endl
+                                                        << " or " << DEFAULT_MCAST_ADDRESS_V6 << endl
+      << "    -p {port}          multicast port, default: " << DEFAULT_MCAST_PORT << endl << endl
 
       << "    -l                 listen mode" << endl
       << "    -o                 turn off loop back on sender" << endl
@@ -83,6 +81,8 @@ int main(int argc, char** argv)
   bool loopBackOn = true;
   bool useIPv6 = false;
   bool useDefaultIp = true;
+  string mcastAddress = DEFAULT_MCAST_ADDRESS_V4;
+  int mcastPort = DEFAULT_MCAST_PORT;
 
   g_ifaces.clear();
 
@@ -98,11 +98,11 @@ int main(int argc, char** argv)
       loopBackOn = false;
       break;
     case 'm':
-      g_McastAddress = optarg;
+      mcastAddress = optarg;
       useDefaultIp = false;
       break;
     case 'p':
-      g_McastPort = atoi(optarg);
+      mcastPort = atoi(optarg);
       break;
     case 'l':
       listenMode = true;
@@ -123,7 +123,7 @@ int main(int argc, char** argv)
    */
   if (useIPv6 && useDefaultIp)
   {
-    g_McastAddress = DEFAULT_MCAST_ADDRESS_V6;
+    mcastAddress = DEFAULT_MCAST_ADDRESS_V6;
   }
 
   /*
@@ -184,11 +184,11 @@ int main(int argc, char** argv)
    */
   if (listenMode)
   {
-    g_McastModule = new ReceiverModule(g_ifaces, g_McastAddress, g_McastPort, useIPv6);
+    g_McastModule = new ReceiverModule(g_ifaces, mcastAddress, mcastPort, useIPv6);
   }
   else
   {
-    g_McastModule = new SenderModule(g_ifaces, g_McastAddress, g_McastPort, loopBackOn, useIPv6);
+    g_McastModule = new SenderModule(g_ifaces, mcastAddress, mcastPort, loopBackOn, useIPv6);
   }
 
   if (g_McastModule)
