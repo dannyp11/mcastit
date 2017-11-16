@@ -145,7 +145,7 @@ int main(int argc, char** argv)
   for (int i = optind; i < argc; ++i)
   {
     const string ifaceName = argv[i];
-    string ifaceAddress;
+    vector<string> ifaceAddresses;
     if (!listenMode || i == optind)
     {
       fd = createSocket(useIPv6);
@@ -158,13 +158,13 @@ int main(int argc, char** argv)
     }
 
     // use interface name
-    if (0 != getIfaceIPFromIfaceName(ifaceName, ifaceAddress, useIPv6))
+    if (0 != getIfaceIPFromIfaceName(ifaceName, ifaceAddresses, useIPv6))
     {
       LOG_ERROR("Can't find interface IP address for " << ifaceName);
       safeExit(2);
     }
 
-    g_ifaces.push_back((IfaceData(ifaceName, ifaceAddress, fd)));
+    g_ifaces.push_back((IfaceData(ifaceName, ifaceAddresses, fd)));
   }
 
   if (0 == g_ifaces.size())
@@ -176,7 +176,7 @@ int main(int argc, char** argv)
       safeExit(1);
     }
 
-    g_ifaces.push_back(IfaceData("", "", sock));
+    g_ifaces.push_back(IfaceData("", vector<string>(), sock));
   }
 
   /*

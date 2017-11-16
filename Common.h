@@ -50,11 +50,11 @@ struct IfaceData
 {
   int sockFd;
   string ifaceName;
-  string ifaceAddress;
+  vector<string> ifaceAddresses;
 
-  IfaceData(): sockFd(-1), ifaceName(""), ifaceAddress("") {}
-  IfaceData(const string& name, const string& address, int fd = -1):
-    sockFd(fd), ifaceName(name), ifaceAddress(address) {}
+  IfaceData(): sockFd(-1), ifaceName(""), ifaceAddresses(vector<string>()) {}
+  IfaceData(const string& name, const vector<string>& addresses, int fd = -1):
+    sockFd(fd), ifaceName(name), ifaceAddresses(addresses) {}
 
   const string& getReadableName() const;
   const string& getReadableAddress() const;
@@ -65,24 +65,14 @@ private:
 };
 
 /**
- * Get ip address for ifaceName
+ * Get ip addresses for ifaceName
  *
  * @param ifaceName - [IN] has to be nonzero length
- * @param ifaceIpAdress - [OUT]
+ * @param ifaceIpAdresses - [OUT] with primary address as the first entry
  * @param isIpV6 - true if create ipv6 socket
  * @return 0 on success, -1 if error
  */
-int getIfaceIPFromIfaceName(const string& ifaceName, string& ifaceIpAdress, bool isIpV6 = false);
-
-/**
- * Get ifaceName from IP address
- *
- * @param ifaceIpAddress  - [IN] has to be nonzero length
- * @param ifaceName       - [OUT] resolved interface name
- * @param isIpV6          - true if create ipv6 socket
- * @return 0 on success, -1 if error
- */
-int getIfaceNameFromIfaceAddress(const string& ifaceIpAddress, string& ifaceName, bool isIpV6 = false);
+int getIfaceIPFromIfaceName(const string& ifaceName, vector<string>& ifaceIpAdresses, bool isIpV6 = false);
 
 /**
  * Create udp socket

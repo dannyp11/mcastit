@@ -7,8 +7,8 @@
  * Maps contain all interface data
  * These maps should only be populated once
  */
-static map<string, string> g_if4_name2ip_map;
-static map<string, string> g_if6_name2ip_map;
+static map<string, vector<string> > g_if4_name2ip_map;
+static map<string, vector<string> > g_if6_name2ip_map;
 
 static bool g_debugMode = false;
 
@@ -47,7 +47,7 @@ static int common_init()
         if (0 == getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in6), ipAddr,
                                                 sizeof(ipAddr), NULL, 0, NI_NUMERICHOST))
         {
-          g_if6_name2ip_map[ifa->ifa_name] = ipAddr;
+          g_if6_name2ip_map[ifa->ifa_name].push_back(ipAddr);
         }
       }
       // check ipv4 interface
@@ -56,7 +56,7 @@ static int common_init()
         if (0 == getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in), ipAddr,
                                                 sizeof(ipAddr), NULL, 0, NI_NUMERICHOST))
         {
-          g_if4_name2ip_map[ifa->ifa_name] = ipAddr;
+          g_if4_name2ip_map[ifa->ifa_name].push_back(ipAddr);
         }
       }
     }
@@ -73,9 +73,9 @@ int createSocket(bool isIpV6)
   return socket(sockFamily, SOCK_DGRAM, 0);
 }
 
-int getIfaceIPFromIfaceName(const string& ifaceName, string& ifaceIpAdress, bool isIpV6)
+int getIfaceIPFromIfaceName(const string& ifaceName, vector<string>& ifaceIpAdresses, bool isIpV6)
 {
-  ifaceIpAdress = "";
+  ifaceIpAdresses.clear();
   if (!ifaceName.size())
   {
     return -1;
@@ -94,19 +94,19 @@ int getIfaceIPFromIfaceName(const string& ifaceName, string& ifaceIpAdress, bool
   {
     if (g_if6_name2ip_map.end() != g_if6_name2ip_map.find(ifaceName))
     {
-      ifaceIpAdress = g_if6_name2ip_map[ifaceName];
+      ifaceIpAdresses = g_if6_name2ip_map[ifaceName];
     }
   }
   else
   {
     if (g_if4_name2ip_map.end() != g_if4_name2ip_map.find(ifaceName))
     {
-      ifaceIpAdress = g_if4_name2ip_map[ifaceName];
+      ifaceIpAdresses = g_if4_name2ip_map[ifaceName];
     }
   }
 
   // Make sure iface ip address has to be found, which means iface name is valid
-  if (!ifaceIpAdress.length())
+  if (!ifaceIpAdresses.size())
   {
     return -1;
   }
@@ -134,8 +134,22 @@ const string& IfaceData::getReadableName() const
 const string& IfaceData::getReadableAddress() const
 {
   static string result = DEFAULT_IP_ADDRESS;
-  if (ifaceAddress.size())
-    result = ifaceAddress;
+
+  if (ifaceAddresses.size() > 0)
+  {
+    result = "";
+    for (unsigned i = 0; i < ifaceAddresses.size(); ++i)
+    {
+      if (i != ifaceAddresses.size() - 1)
+      {
+        result += ifaceAddresses[i] + ",";
+      }
+      else
+      {
+        result += ifaceAddresses[i];
+      }
+    }
+  }
   return result;
 }
 
