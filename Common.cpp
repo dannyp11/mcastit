@@ -18,7 +18,7 @@ static bool g_debugMode = false;
  */
 static int common_init()
 {
-  bool alreadyRan = false;
+  static bool alreadyRan = false;
   static int retVal = -1;
   if (!alreadyRan)
   {
