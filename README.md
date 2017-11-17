@@ -11,18 +11,20 @@ Therefore, may I introduce you mcastit: a network tool that specializes in netwo
 ### Feature:
 
  * IPv4 & IPv6
- * Multicast sender with/without loopback
+ * Multicast sender with/without loopback & interval
  * Multiple network interface support
 
 ### Usage
 
 ```bash
 ./mcastit [options] [iface1 iface2 ...]
+
     Option:
     -6                 use IPv6
-    -m {mcast address} multicast address, default: 239.192.0.123 and FFFE::1:FF47:0(v6)
+    -m {mcast address} multicast address, default: 239.192.0.123 or FFFE::1:FF47:0
     -p {port}          multicast port, default: 12321
 
+    -i {interval}      interval in seconds if send in loop
     -l                 listen mode
     -o                 turn off loop back on sender
     -h                 This message
