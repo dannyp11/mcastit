@@ -1,11 +1,17 @@
 #include "SenderModule.h"
 
 SenderModule::SenderModule(const vector<IfaceData>& ifaces, const string& mcastAddress,
-    int mcastPort, bool loopbackOn, bool useIpV6) :
-    McastModuleInterface(ifaces, mcastAddress, mcastPort, useIpV6), mIsLoopBackOn(loopbackOn)
+    int mcastPort, bool loopbackOn, bool useIpV6, float loopInterval) :
+    McastModuleInterface(ifaces, mcastAddress, mcastPort, useIpV6),
+    mIsLoopBackOn(loopbackOn), mLoopInterval(loopInterval)
 {
   string loopMsg = (mIsLoopBackOn) ? "with" : "without";
-  cout << "Sending " << loopMsg << " loopback" << endl;
+  cout << "Sending " << loopMsg << " loopback";
+  if (shouldLoop())
+  {
+    cout << " with interval " << mLoopInterval << " second(s)";
+  }
+  cout << endl;
 }
 
 bool SenderModule::run()
@@ -58,40 +64,56 @@ bool SenderModule::run()
   }
 
   const string dmsg = "<Sender info:";
+  int msgSeqNumber = 1;
 
-  for (unsigned i = 0; i < mIfaces.size(); ++i)
+  do
   {
-    const IfaceData ifaceData = mIfaces[i];
-    int fd = ifaceData.sockFd;
+    for (unsigned i = 0; i < mIfaces.size(); ++i)
+    {
+      const IfaceData ifaceData = mIfaces[i];
+      int fd = ifaceData.sockFd;
 
-    // build message
-    std::stringstream msg;
-    msg << dmsg << " " << ifaceData << ">";
+      // build message
+      std::stringstream msg;
+      msg << dmsg << " " << ifaceData << ">";
+      if (shouldLoop())
+      {
+        msg << " seqId " << msgSeqNumber;
+      }
 
-    // send message
-    int byteSent;
-    if (!isIpV6())
-    {
-      byteSent = sendto(fd, msg.str().c_str(), 1 + msg.str().size(),
-                            MSG_NOSIGNAL, (struct sockaddr *) &addr, sizeof(addr));
-    }
-    else
-    {
-      byteSent = sendto(fd, msg.str().c_str(), 1 + msg.str().size(),
-                            MSG_NOSIGNAL, (struct sockaddr *) &addr6, sizeof(addr6));
+      // send message
+      int byteSent;
+      if (!isIpV6())
+      {
+        byteSent = sendto(fd, msg.str().c_str(), 1 + msg.str().size(),
+                              MSG_NOSIGNAL, (struct sockaddr *) &addr, sizeof(addr));
+      }
+      else
+      {
+        byteSent = sendto(fd, msg.str().c_str(), 1 + msg.str().size(),
+                              MSG_NOSIGNAL, (struct sockaddr *) &addr6, sizeof(addr6));
+      }
+
+      // Error check for sending message
+      if (0 > byteSent)
+      {
+        LOG_ERROR("sendto " << ifaceData << " :" << strerror(errno));
+        return false;
+      }
+      else
+      {
+        cout << "[OK] sent to [" << ifaceData << "] bytes: " << byteSent << endl;
+      }
     }
 
-    // Error check for sending message
-    if (0 > byteSent)
+    // loop interval
+    if (shouldLoop())
     {
-      LOG_ERROR("sendto " << ifaceData << " :" << strerror(errno));
-      return false;
+      ++msgSeqNumber;
+      (void) usleep( (int)(mLoopInterval*1e6) );
     }
-    else
-    {
-      cout << "[OK] sent to [" << ifaceData << "] bytes: " << byteSent << endl;
-    }
-  }
+
+  } while (shouldLoop());
 
   return true;
 }
@@ -182,4 +204,9 @@ bool SenderModule::setMcastWithV6IfaceName(int fd, const char* ifaceName)
   }
 
   return true;
+}
+
+bool SenderModule::shouldLoop() const
+{
+  return mLoopInterval > 0.0;
 }

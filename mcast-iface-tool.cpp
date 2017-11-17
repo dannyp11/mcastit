@@ -23,6 +23,7 @@ static void usage(int /*argc*/, char * argv[])
                                                         << " or " << DEFAULT_MCAST_ADDRESS_V6 << endl
       << "    -p {port}          multicast port, default: " << DEFAULT_MCAST_PORT << endl << endl
 
+      << "    -i {interval}      interval in seconds if send in loop" << endl
       << "    -l                 listen mode" << endl
       << "    -o                 turn off loop back on sender" << endl
       << "    -h                 This message, (version " __DATE__ << " " << __TIME__ << ")" << endl << endl;
@@ -83,11 +84,13 @@ int main(int argc, char** argv)
   bool useDefaultIp = true;
   string mcastAddress = DEFAULT_MCAST_ADDRESS_V4;
   int mcastPort = DEFAULT_MCAST_PORT;
+  int exitVal = 0;
+  float sendInterval = -1;
 
   g_ifaces.clear();
 
   int command = -1;
-  while ((command = getopt(argc, argv, "D6lom:p:h")) != -1)
+  while ((command = getopt(argc, argv, "D6lom:p:i:h")) != -1)
   {
     switch (command)
     {
@@ -106,6 +109,9 @@ int main(int argc, char** argv)
       break;
     case 'l':
       listenMode = true;
+      break;
+    case 'i':
+      sendInterval = atof(optarg);
       break;
     case 'D':
       cout << "Debug mode ON" << endl;
@@ -188,7 +194,8 @@ int main(int argc, char** argv)
   }
   else
   {
-    g_McastModule = new SenderModule(g_ifaces, mcastAddress, mcastPort, loopBackOn, useIPv6);
+    g_McastModule = new SenderModule(g_ifaces, mcastAddress, mcastPort,
+                                                  loopBackOn, useIPv6, sendInterval);
   }
 
   if (g_McastModule)
@@ -196,13 +203,15 @@ int main(int argc, char** argv)
     if (!g_McastModule->run())
     {
       cout << "Error running module, exiting..." << endl;
+      exitVal = 1;
     }
   }
   else
   {
     cout << "Error spawning mcast module" << endl;
+    exitVal = 2;
   }
 
   cleanup();
-  return 0;
+  return exitVal;
 }

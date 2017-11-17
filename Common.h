@@ -43,6 +43,9 @@ using std::map;
         else std::cerr << __FILE__ << ":" << __LINE__ << " [ERROR] " << msg << endl;\
     } while(0)
 
+// Set of all mcast addresses
+typedef set<string> McastAddressSet;
+
 /**
  * Struct that contains interface name and its associated socket
  */
