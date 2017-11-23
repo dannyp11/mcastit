@@ -3,7 +3,7 @@
 SenderModule::SenderModule(const vector<IfaceData>& ifaces, const string& mcastAddress,
     int mcastPort, bool loopbackOn, bool useIpV6, float loopInterval) :
     McastModuleInterface(ifaces, mcastAddress, mcastPort, useIpV6),
-    mIsLoopBackOn(loopbackOn), mLoopInterval(loopInterval), mUcastRXSocket(-1)
+    mIsLoopBackOn(loopbackOn), mLoopInterval(loopInterval)
 {
   string loopMsg = (mIsLoopBackOn) ? "with" : "without";
   cout << "Sending " << loopMsg << " loopback";
@@ -55,12 +55,11 @@ bool SenderModule::run()
 
   // build addr struct
   struct sockaddr_in addr;
-  int sinFamily = (isIpV6())? AF_INET6 : AF_INET;
-  addr.sin_family = sinFamily;
+  addr.sin_family = AF_INET;
   addr.sin_port = htons(mMcastPort);
 
   struct sockaddr_in6 addr6;
-  addr6.sin6_family = sinFamily;
+  addr6.sin6_family = AF_INET6;
   addr6.sin6_port = htons(mMcastPort);
 
   // setup mcast IP address
@@ -82,30 +81,31 @@ bool SenderModule::run()
 
   do
   {
+    char msgBuf[MCAST_BUFF_LEN];
     for (unsigned i = 0; i < mIfaces.size(); ++i)
     {
       const IfaceData ifaceData = mIfaces[i];
       int fd = ifaceData.sockFd;
 
       // build message
-      std::stringstream msg;
-      msg << dmsg << " " << ifaceData << ">";
+      memset(msgBuf, 0 ,sizeof(msgBuf));
       if (shouldLoop())
       {
-        msg << " seqId " << msgSeqNumber;
+        sprintf(msgBuf, "%4d ", msgSeqNumber);
       }
+      sprintf(msgBuf, "%s%s %s>", msgBuf, dmsg.c_str(), ifaceData.toString().c_str());
 
       // send message
       int byteSent;
       if (!isIpV6())
       {
-        byteSent = sendto(fd, msg.str().c_str(), 1 + msg.str().size(),
-                              MSG_NOSIGNAL, (struct sockaddr *) &addr, sizeof(addr));
+        byteSent = sendto(fd, msgBuf, strlen(msgBuf) + 1,
+                    MSG_NOSIGNAL|MSG_DONTWAIT, (struct sockaddr *) &addr, sizeof(addr));
       }
       else
       {
-        byteSent = sendto(fd, msg.str().c_str(), 1 + msg.str().size(),
-                              MSG_NOSIGNAL, (struct sockaddr *) &addr6, sizeof(addr6));
+        byteSent = sendto(fd, msgBuf, strlen(msgBuf) + 1,
+                    MSG_NOSIGNAL|MSG_DONTWAIT, (struct sockaddr *) &addr6, sizeof(addr6));
       }
 
       // Error check for sending message
@@ -116,7 +116,7 @@ bool SenderModule::run()
       }
       else
       {
-        cout << "[OK] sent to [" << ifaceData << "] bytes: " << byteSent << endl;
+        LOG_DEBUG("[SENT] " << ifaceData << " bytes: " << byteSent);
       }
     }
 
@@ -129,7 +129,8 @@ bool SenderModule::run()
 
   } while (shouldLoop());
 
-  sleep(2);
+  // Allow ack listener for 3 seconds
+  sleep(3);
   mIsStopped = true;
   return true;
 }
@@ -171,11 +172,18 @@ bool SenderModule::setMcastWithIfaceName(int fd, const char* ifaceName)
   }
 
   // Next, bind socket to a fix port
+  in_addr_t meSinAddr = htonl(INADDR_ANY);
+  vector<string> meIps;
+  if (0 == getIfaceIPFromIfaceName(ifaceName, meIps, false))
+  {
+    meSinAddr = inet_addr(meIps[0].c_str());
+  }
+
   struct sockaddr_in me_addr;
   memset((char*) &me_addr, 0, sizeof(me_addr));
   me_addr.sin_family = AF_INET;
   me_addr.sin_port = htons(mMcastPort);
-  me_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+  me_addr.sin_addr.s_addr = meSinAddr;
   if (-1 == ::bind(fd, (struct sockaddr*)&me_addr, sizeof(me_addr)))
   {
     LOG_ERROR("sockopt bind: " << strerror(errno));
@@ -234,6 +242,29 @@ bool SenderModule::setMcastWithV6IfaceName(int fd, const char* ifaceName)
     return false;
   }
 
+  // Bind the socket to the multicast port.
+  struct sockaddr_in6 bindAddr6;
+  vector<string> meIps;
+  if (0 == getIfaceIPFromIfaceName(ifaceName, meIps, true))
+  {
+    if (0 == inet_pton(AF_INET6, meIps[0].c_str(), &bindAddr6.sin6_addr))
+    {
+      LOG_ERROR("Error parsing address for " << mMcastAddress);
+      return -1;
+    }
+  }
+
+  memset(&bindAddr6, 0, sizeof(bindAddr6));
+  bindAddr6.sin6_family = AF_INET6;
+  bindAddr6.sin6_port = htons(mMcastPort);
+  res = ::bind(fd, (struct sockaddr *) &bindAddr6, sizeof(bindAddr6));
+  if (0 > res)
+  // ignore EINVAL for allowing multiple mcast interfaces in same socket
+  {
+    LOG_ERROR("bind: " << strerror(errno));
+    return -1;
+  }
+
   // If iface name specified, set iface name for the socket
   if (0 < strlen(ifaceName))
   {
@@ -248,90 +279,93 @@ bool SenderModule::setMcastWithV6IfaceName(int fd, const char* ifaceName)
   return true;
 }
 
-bool SenderModule::setupUcastReceiver()
-{
-  if (mUcastRXSocket > -1)
-  {
-    return true;
-  }
-
-  mUcastRXSocket = createSocket(isIpV6());
-  if (-1 == mUcastRXSocket)
-  {
-    LOG_ERROR("setupUcastReceiver: can't create socket");
-    return false;
-  }
-
-  if (-1 == setReuseSocket(mUcastRXSocket))
-  {
-    LOG_ERROR("setupUcastReceiver: can't reuse on socket " << mUcastRXSocket);
-    mUcastRXSocket = -1;
-    return false;
-  }
-
-  // Build host to bind
-  if (!isIpV6())
-  {
-    // use ip v4
-    struct sockaddr_in me_addr;
-    memset(&me_addr, 0, sizeof(me_addr));
-    me_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    me_addr.sin_port = htons(mAckPort);
-    me_addr.sin_family = AF_INET;
-
-    if (-1 == ::bind(mUcastRXSocket, (struct sockaddr*)&me_addr, sizeof(me_addr)))
-    {
-      LOG_ERROR("setupUcastReceiver: cannot bind: " << strerror(errno));
-      return false;
-    }
-  }
-  else
-  {
-    // use ip v6
-    struct sockaddr_in6 me_addr6;
-    me_addr6.sin6_flowinfo = 0;
-    me_addr6.sin6_family = AF_INET6;
-    me_addr6.sin6_addr = in6addr_any;
-    me_addr6.sin6_port = htons(mAckPort);
-    if (-1 == ::bind(mUcastRXSocket, (struct sockaddr*)&me_addr6, sizeof(me_addr6)))
-    {
-      LOG_ERROR("setupUcastReceiver: cannot bind: " << strerror(errno));
-      return false;
-    }
-  }
-
-  return true;
-}
-
 void* SenderModule::runUcastReceiver()
 {
-  // Setup unicast receiver socket
-  int retries = 0;
-  while (!setupUcastReceiver() && retries < 100)
-  {
-    LOG_ERROR("Cannot setup unicast receiver, try #" <<retries++);
-    sleep(retries);
-  }
-
   // Now listen to ack msgs
   char rxBuf[MCAST_BUFF_LEN];
   struct sockaddr_storage rmt;
+  fd_set listenSet;
+  struct timeval timeout;
+  int maxFd = -1;
+  for (unsigned i = 0; i < mIfaces.size(); ++i)
+  {
+    maxFd = (maxFd < mIfaces[i].sockFd)? mIfaces[i].sockFd : maxFd;
+  }
+
   while (!mIsStopped)
   {
-    socklen_t rmtLen = sizeof(rmt);
-    memset(rxBuf, 0, sizeof(rxBuf));
-    cout << "listening..." << endl;
-    int rxBytes = recvfrom(mUcastRXSocket, rxBuf, sizeof(rxBuf),
-                            0, (struct sockaddr*)&rmt, &rmtLen);
-
-    if (-1 == rxBytes)
+    LOG_DEBUG("listening...");
+    FD_ZERO(&listenSet);
+    for (unsigned i = 0; i < mIfaces.size(); ++i)
     {
-      LOG_ERROR("runUcastReceiver: recvfrom: "<< strerror(errno));
-      sleep(1);
+      FD_SET(mIfaces[i].sockFd, &listenSet);
+    }
+
+    timeout.tv_sec = 1;
+    timeout.tv_usec = 1;
+
+    int numReady = select(maxFd + 1, &listenSet, NULL, NULL, &timeout);
+    if (numReady == 0)
+    {
       continue;
     }
 
-    cout << "Result: " << rxBuf << endl;
+    while(numReady-- > 0)
+    {
+      int resultFd = -1;
+      for (unsigned ii = 0 ; ii < mIfaces.size(); ++ii)
+      {
+        resultFd = mIfaces[ii].sockFd;
+        if (FD_ISSET(resultFd, &listenSet))
+        {
+          FD_CLR(resultFd, &listenSet);
+          break;
+        }
+      }
+
+      // Get respond data
+      memset(rxBuf, 0, sizeof(rxBuf));
+      socklen_t rmtLen = sizeof(rmt);
+      int rxBytes = recvfrom(resultFd, rxBuf, sizeof(rxBuf), 0,
+                                (struct sockaddr*) &rmt, &rmtLen);
+
+      if (-1 == rxBytes)
+      {
+        LOG_ERROR("recvfrom: "<< strerror(errno));
+        sleep(1);
+        continue;
+      }
+
+      // get the sender info
+      char senderIp[INET6_ADDRSTRLEN];
+      if (rmt.ss_family == AF_INET)
+      {
+        struct sockaddr_in *sender_addr = (struct sockaddr_in*) &rmt;
+        inet_ntop(rmt.ss_family, &sender_addr->sin_addr, senderIp, sizeof(senderIp));
+      }
+      else if (rmt.ss_family == AF_INET6)
+      {
+        struct sockaddr_in6 *sender_addr = (struct sockaddr_in6*) &rmt;
+        inet_ntop(rmt.ss_family, &sender_addr->sin6_addr, senderIp, sizeof(senderIp));
+      }
+
+      string decodedMsg;
+      if (decodeAckMessage(rxBuf, decodedMsg))
+      {
+        if (isIpV6())
+        {
+          printf("[ACK] %-45s (%s)\n", senderIp, decodedMsg.c_str());
+        }
+        else
+        {
+          printf("[ACK] %-15s (%s)\n", senderIp, decodedMsg.c_str());
+        }
+      }
+      else
+      {
+        cout << "Stray message: " << rxBuf << endl;
+      }
+    }
   }
 
   return 0;

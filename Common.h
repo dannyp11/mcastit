@@ -36,12 +36,17 @@ using std::set;
 using std::map;
 
 #define MCAST_BUFF_LEN    (1024)  // message length
-#define ACK_SIGNATURE     "-MCAST-ACK" // append to make the ack message
 
 // print out error message to stderr
 #define LOG_ERROR(msg) \
     do {if (!isDebugMode()) std::cerr << "[ERROR] " << msg << endl;\
-        else std::cerr << __FILE__ << ":" << __LINE__ << " [ERROR] " << msg << endl;\
+        else std::cerr << __FILE__ << ":" << __LINE__ << "-(" \
+        <<__func__ << ") [ERROR] " << msg << endl;\
+    } while(0)
+
+#define LOG_DEBUG(msg) \
+    do {if (isDebugMode()) std::cerr << __FILE__ << ":" \
+        << __LINE__ << "-(" <<__func__ << ") [DEBUG] " << msg << endl;\
     } while(0)
 
 // Set of all mcast addresses
@@ -103,5 +108,14 @@ void cleanupCommon();
  */
 void setDebugMode(bool enable = true);
 bool isDebugMode();
+
+/**
+ * Encode/decode ack message
+ * @param message     [IN]  message to be processed
+ * @param resultMsg   [OUT] result message, = message if failed to de/encode
+ * @return  true on success
+ */
+bool encodeAckMessage(const string& message, string& resultMsg);
+bool decodeAckMessage(const string& message, string& resultMsg);
 
 #endif /*COMMON_H_*/

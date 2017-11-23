@@ -10,7 +10,11 @@
 static map<string, vector<string> > g_if4_name2ip_map;
 static map<string, vector<string> > g_if6_name2ip_map;
 
+// Debug info
 static bool g_debugMode = false;
+
+// Misc values
+static const string ACK_SIGNATURE = "-MCAST-ACK"; // append to make the ack message
 
 /**
  * Init g_ifap
@@ -175,7 +179,6 @@ bool isDebugMode()
 int setReuseSocket(int sock)
 {
   int opt = 1;
-
   // Reuse address
   int res = setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
   if (0 > res)
@@ -185,15 +188,35 @@ int setReuseSocket(int sock)
     return -1;
   }
 
-  // Reuse port
-  opt = 1;
-  res = setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt));
-  if (0 > res)
+  return 0;
+}
+
+bool encodeAckMessage(const string& message, string& resultMsg)
+{
+  std::stringstream stm;
+  stm << message << " - " << getpid() << ACK_SIGNATURE;
+  resultMsg = stm.str();
+  return true;
+}
+
+bool decodeAckMessage(const string& message, string& resultMsg)
+{
+  resultMsg = message;
+
+  // Check if message is longer than signature
+  if (resultMsg.length() < ACK_SIGNATURE.length())
   {
-    LOG_ERROR("commonSetupSocketFd[ "<< sock
-            << " ] sockopt SO_REUSEPORT: " << strerror(errno));
-    return -1;
+    return false;
   }
 
-  return 0;
+  // Check if message ends with signature
+  if (!std::equal(ACK_SIGNATURE.rbegin(), ACK_SIGNATURE.rend(), message.rbegin()))
+  {
+    return false;
+  }
+
+  // Good, now trim the ack sig from message
+  resultMsg = message.substr(0, message.size() - ACK_SIGNATURE.size());
+
+  return true;
 }

@@ -44,7 +44,7 @@ bool ReceiverModule::run()
    */
   struct timeval timeout;
   fd_set rfds;
-  int8_t buffer[MCAST_BUFF_LEN];
+  char buffer[MCAST_BUFF_LEN];
   while (1)
   {
     FD_ZERO(&rfds);
@@ -114,13 +114,19 @@ bool ReceiverModule::run()
       }
 
       // print result message
-      printf("%s - %d - %s\n", senderIp, recvLen, buffer);
+      if (isIpV6())
+      {
+        printf("%-40s - %s\n", senderIp, buffer);
+      }
+      else
+      {
+        printf("%-15s - %s\n", senderIp, buffer);
+      }
 
       // Build response message
-      string respond(buffer, buffer + recvLen);
-      respond += ACK_SIGNATURE;
-      cout << "Responding with " << respond << endl;
-      if (!sendAck(sender, respond))
+      string responseMsg;
+      encodeAckMessage(buffer, responseMsg);
+      if (!sendAck(sender, responseMsg))
       {
         LOG_ERROR("sending ack message to " << senderIp);
       }
@@ -141,14 +147,14 @@ int ReceiverModule::joinMcastIface(int sock, const char* ifaceName)
   int res = setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &buffSz, sizeof(buffSz));
   if (0 > res)
   {
-    LOG_ERROR("joinMcastIface sockopt BuffSz: " << strerror(errno));
+    LOG_ERROR("sockopt BuffSz: " << strerror(errno));
     return -1;
   }
 
   // Let's set reuse port & address to on to allow multiple binds per host.
   if (-1 == setReuseSocket(sock))
   {
-    LOG_ERROR("joinMcastIface can't reuse socket");
+    LOG_ERROR("can't reuse socket");
     return -1;
   }
 
@@ -162,7 +168,7 @@ int ReceiverModule::joinMcastIface(int sock, const char* ifaceName)
   if (0 > res && errno != EINVAL)
   // ignore EINVAL for allowing multiple mcast interfaces in same socket
   {
-    LOG_ERROR("joinMcastIface bind: " << strerror(errno));
+    LOG_ERROR("bind: " << strerror(errno));
     return -1;
   }
 
@@ -199,14 +205,14 @@ int ReceiverModule::joinMcastIfaceV6(int sock, const char* ifaceName)
   int res = setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &buffSz, sizeof(buffSz));
   if (0 > res)
   {
-    LOG_ERROR("joinMcastIfaceV6 sockopt BuffSz: " << strerror(errno));
+    LOG_ERROR("sockopt BuffSz: " << strerror(errno));
     return -1;
   }
 
   // Let's set reuse port to on to allow multiple binds per host.
   if (-1 == setReuseSocket(sock))
   {
-    LOG_ERROR("joinMcastIfaceV6 can't reuse socket");
+    LOG_ERROR("can't reuse socket");
     return -1;
   }
 
@@ -219,7 +225,7 @@ int ReceiverModule::joinMcastIfaceV6(int sock, const char* ifaceName)
   if (0 > res && errno != EINVAL)
     // ignore EINVAL for allowing multiple mcast interfaces in same socket
   {
-    LOG_ERROR("joinMcastIfaceV6 bind: " << strerror(errno));
+    LOG_ERROR("bind: " << strerror(errno));
     return -1;
   }
 
@@ -255,7 +261,7 @@ bool ReceiverModule::sendAck(struct sockaddr_storage& sender, const string& ackM
 
   if (-1 == setReuseSocket(sock))
   {
-    LOG_ERROR("sendAck can't reuse socket");
+    LOG_ERROR("can't reuse socket");
     return false;
   }
 
@@ -265,24 +271,12 @@ bool ReceiverModule::sendAck(struct sockaddr_storage& sender, const string& ackM
     struct sockaddr_in *sender_addr = (struct sockaddr_in*) &sender;
     socklen_t senderLen = sizeof(*sender_addr);
 
-    // ready to bind
-    struct sockaddr_in me_addr;
-    memset(&me_addr, 0, sizeof(me_addr));
-    me_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    me_addr.sin_port = htons(mAckPort);
-    me_addr.sin_family = AF_INET;
-    if (-1 == bind(sock, (struct sockaddr*)&me_addr, sizeof(me_addr)))
-    {
-      LOG_ERROR("sendAck cannot bind: " << strerror(errno));
-      ::close(sock);
-      return false;
-    }
-
+    // No need to bind since there's no expected response to this module
     unsigned ackMsgLen = ackMsg.length() + 1;
     if (ackMsgLen != sendto(sock, ackMsg.c_str(), ackMsgLen,
                                       0, (struct sockaddr*)sender_addr, senderLen))
     {
-      LOG_ERROR("sendAck cannot sendto: " << strerror(errno));
+      LOG_ERROR("cannot sendto: " << strerror(errno));
       ::close(sock);
       return false;
     }
@@ -292,21 +286,18 @@ bool ReceiverModule::sendAck(struct sockaddr_storage& sender, const string& ackM
     struct sockaddr_in6 *sender_addr = (struct sockaddr_in6*) &sender;
     int senderLen = sizeof(*sender_addr);
 
-    if (-1 == ::bind(sock, (struct sockaddr*)sender_addr, senderLen))
-    {
-      LOG_ERROR("sendAck cannot bind: " << strerror(errno));
-      ::close(sock);
-      return false;
-    }
-
-    if (-1 == sendto(sock, ackMsg.c_str(), ackMsg.size() + 1,
+    // No need to bind since there's no expected response to this module
+    unsigned ackMsgLen = ackMsg.length() + 1;
+    if (ackMsgLen != sendto(sock, ackMsg.c_str(), ackMsg.size() + 1,
                                       0, (struct sockaddr*) sender_addr, senderLen))
     {
-      LOG_ERROR("sendAck cannot sendto: " << strerror(errno));
+      LOG_ERROR("cannot sendto: " << strerror(errno));
+      ::close(sock);
       return false;
     }
   }
 
+  LOG_DEBUG("[OK] responded: " << ackMsg);
   ::close(sock);
   return true;
 }
