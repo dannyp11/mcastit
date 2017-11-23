@@ -253,6 +253,7 @@ int ReceiverModule::joinMcastIfaceV6(int sock, const char* ifaceName)
 bool ReceiverModule::sendAck(struct sockaddr_storage& sender, const string& ackMsg) const
 {
   int sock = createSocket(isIpV6());
+  int sendBytes = -1;
   if (-1 == sock)
   {
     LOG_ERROR("cannot create socket");
@@ -272,9 +273,9 @@ bool ReceiverModule::sendAck(struct sockaddr_storage& sender, const string& ackM
     socklen_t senderLen = sizeof(*sender_addr);
 
     // No need to bind since there's no expected response to this module
-    unsigned ackMsgLen = ackMsg.length() + 1;
-    if (ackMsgLen != sendto(sock, ackMsg.c_str(), ackMsgLen,
-                                      0, (struct sockaddr*)sender_addr, senderLen))
+    int ackMsgLen = ackMsg.length() + 1;
+    if (ackMsgLen != (sendBytes = sendto(sock, ackMsg.c_str(), ackMsgLen,
+                                      0, (struct sockaddr*)sender_addr, senderLen)))
     {
       LOG_ERROR("cannot sendto: " << strerror(errno));
       ::close(sock);
@@ -287,9 +288,9 @@ bool ReceiverModule::sendAck(struct sockaddr_storage& sender, const string& ackM
     int senderLen = sizeof(*sender_addr);
 
     // No need to bind since there's no expected response to this module
-    unsigned ackMsgLen = ackMsg.length() + 1;
-    if (ackMsgLen != sendto(sock, ackMsg.c_str(), ackMsg.size() + 1,
-                                      0, (struct sockaddr*) sender_addr, senderLen))
+    int ackMsgLen = ackMsg.length() + 1;
+    if (ackMsgLen != (sendBytes = sendto(sock, ackMsg.c_str(), ackMsgLen,
+                                      0, (struct sockaddr*) sender_addr, senderLen)))
     {
       LOG_ERROR("cannot sendto: " << strerror(errno));
       ::close(sock);
@@ -297,7 +298,7 @@ bool ReceiverModule::sendAck(struct sockaddr_storage& sender, const string& ackM
     }
   }
 
-  LOG_DEBUG("[OK] responded: " << ackMsg);
+  LOG_DEBUG("[OK] responded: " << sendBytes << " bytes");
   ::close(sock);
   return true;
 }

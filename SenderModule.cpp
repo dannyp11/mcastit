@@ -14,6 +14,7 @@ SenderModule::SenderModule(const vector<IfaceData>& ifaces, const string& mcastA
   cout << endl;
 
   mIsStopped = false;
+  mSenderPort = mMcastPort+1;
 }
 
 bool SenderModule::run()
@@ -182,7 +183,7 @@ bool SenderModule::setMcastWithIfaceName(int fd, const char* ifaceName)
   struct sockaddr_in me_addr;
   memset((char*) &me_addr, 0, sizeof(me_addr));
   me_addr.sin_family = AF_INET;
-  me_addr.sin_port = htons(mMcastPort);
+  me_addr.sin_port = htons(mSenderPort);
   me_addr.sin_addr.s_addr = meSinAddr;
   if (-1 == ::bind(fd, (struct sockaddr*)&me_addr, sizeof(me_addr)))
   {
@@ -244,22 +245,22 @@ bool SenderModule::setMcastWithV6IfaceName(int fd, const char* ifaceName)
 
   // Bind the socket to the multicast port.
   struct sockaddr_in6 bindAddr6;
+  memset(&bindAddr6, 0, sizeof(bindAddr6));
+
   vector<string> meIps;
   if (0 == getIfaceIPFromIfaceName(ifaceName, meIps, true))
   {
-    if (0 == inet_pton(AF_INET6, meIps[0].c_str(), &bindAddr6.sin6_addr))
+    if (1 != inet_pton(AF_INET6, meIps[0].c_str(), &(bindAddr6.sin6_addr)))
     {
       LOG_ERROR("Error parsing address for " << mMcastAddress);
       return -1;
     }
   }
 
-  memset(&bindAddr6, 0, sizeof(bindAddr6));
   bindAddr6.sin6_family = AF_INET6;
-  bindAddr6.sin6_port = htons(mMcastPort);
+  bindAddr6.sin6_port = htons(mSenderPort);
   res = ::bind(fd, (struct sockaddr *) &bindAddr6, sizeof(bindAddr6));
   if (0 > res)
-  // ignore EINVAL for allowing multiple mcast interfaces in same socket
   {
     LOG_ERROR("bind: " << strerror(errno));
     return -1;

@@ -37,6 +37,7 @@ private:
   bool mIsLoopBackOn;
   float mLoopInterval; // loop micro seconds, -1 if send once
   string mMcastSingleAddress;
+  int mSenderPort;
 
 // multi thread area -----------------------------
 private:
