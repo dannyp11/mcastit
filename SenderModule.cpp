@@ -3,7 +3,7 @@
 SenderModule::SenderModule(const vector<IfaceData>& ifaces, const string& mcastAddress,
     int mcastPort, bool loopbackOn, bool useIpV6, float loopInterval) :
     McastModuleInterface(ifaces, mcastAddress, mcastPort, useIpV6),
-    mIsLoopBackOn(loopbackOn), mLoopInterval(loopInterval)
+    mIsLoopBackOn(loopbackOn), mLoopInterval(loopInterval), mUcastRXSocket(-1)
 {
   string loopMsg = (mIsLoopBackOn) ? "with" : "without";
   cout << "Sending " << loopMsg << " loopback";
@@ -12,6 +12,8 @@ SenderModule::SenderModule(const vector<IfaceData>& ifaces, const string& mcastA
     cout << " with interval " << mLoopInterval << " second(s)";
   }
   cout << endl;
+
+  mIsStopped = false;
 }
 
 bool SenderModule::run()
@@ -36,6 +38,18 @@ bool SenderModule::run()
       LOG_ERROR("Setting mcast for " << mIfaces[i]);
       return false;
     }
+  }
+
+  // Spawn listener thread
+  pthread_t rxThread;
+  if (0 != pthread_create(&rxThread, NULL, &SenderModule::rxThreadHelper, this))
+  {
+    LOG_ERROR("Cannot spawn listener thread");
+    return false;
+  }
+  else
+  {
+    cout << "Listener thread started [OK]" << endl;
   }
   cout << "==============================================================" << endl;
 
@@ -115,6 +129,8 @@ bool SenderModule::run()
 
   } while (shouldLoop());
 
+  sleep(2);
+  mIsStopped = true;
   return true;
 }
 
@@ -138,12 +154,31 @@ bool SenderModule::setMcastWithIfaceName(int fd, const char* ifaceName)
     return false;
   }
 
+  // Enable reuse ip/port
+  if (-1 == setReuseSocket(fd))
+  {
+    LOG_ERROR("sockopt cannot reuse socket " << fd);
+    return false;
+  }
+
   // Enable loop back if set.
   opt = mIsLoopBackOn;
   res = setsockopt(fd, IPPROTO_IP, IP_MULTICAST_LOOP, (void*) &opt, sizeof(opt));
   if (0 > res)
   {
     LOG_ERROR("sockopt IP_MULTICAST_LOOP: " << strerror(errno));
+    return false;
+  }
+
+  // Next, bind socket to a fix port
+  struct sockaddr_in me_addr;
+  memset((char*) &me_addr, 0, sizeof(me_addr));
+  me_addr.sin_family = AF_INET;
+  me_addr.sin_port = htons(mMcastPort);
+  me_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+  if (-1 == ::bind(fd, (struct sockaddr*)&me_addr, sizeof(me_addr)))
+  {
+    LOG_ERROR("sockopt bind: " << strerror(errno));
     return false;
   }
 
@@ -183,6 +218,13 @@ bool SenderModule::setMcastWithV6IfaceName(int fd, const char* ifaceName)
     return false;
   }
 
+  // Enable reuse ip/port
+  if (-1 == setReuseSocket(fd))
+  {
+    LOG_ERROR("sockopt cannot reuse socket " << fd);
+    return false;
+  }
+
   // Enable loop back if set.
   opt = mIsLoopBackOn;
   res = setsockopt(fd, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, (void*) &opt, sizeof(opt));
@@ -206,7 +248,101 @@ bool SenderModule::setMcastWithV6IfaceName(int fd, const char* ifaceName)
   return true;
 }
 
+bool SenderModule::setupUcastReceiver()
+{
+  if (mUcastRXSocket > -1)
+  {
+    return true;
+  }
+
+  mUcastRXSocket = createSocket(isIpV6());
+  if (-1 == mUcastRXSocket)
+  {
+    LOG_ERROR("setupUcastReceiver: can't create socket");
+    return false;
+  }
+
+  if (-1 == setReuseSocket(mUcastRXSocket))
+  {
+    LOG_ERROR("setupUcastReceiver: can't reuse on socket " << mUcastRXSocket);
+    mUcastRXSocket = -1;
+    return false;
+  }
+
+  // Build host to bind
+  if (!isIpV6())
+  {
+    // use ip v4
+    struct sockaddr_in me_addr;
+    memset(&me_addr, 0, sizeof(me_addr));
+    me_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    me_addr.sin_port = htons(mAckPort);
+    me_addr.sin_family = AF_INET;
+
+    if (-1 == ::bind(mUcastRXSocket, (struct sockaddr*)&me_addr, sizeof(me_addr)))
+    {
+      LOG_ERROR("setupUcastReceiver: cannot bind: " << strerror(errno));
+      return false;
+    }
+  }
+  else
+  {
+    // use ip v6
+    struct sockaddr_in6 me_addr6;
+    me_addr6.sin6_flowinfo = 0;
+    me_addr6.sin6_family = AF_INET6;
+    me_addr6.sin6_addr = in6addr_any;
+    me_addr6.sin6_port = htons(mAckPort);
+    if (-1 == ::bind(mUcastRXSocket, (struct sockaddr*)&me_addr6, sizeof(me_addr6)))
+    {
+      LOG_ERROR("setupUcastReceiver: cannot bind: " << strerror(errno));
+      return false;
+    }
+  }
+
+  return true;
+}
+
+void* SenderModule::runUcastReceiver()
+{
+  // Setup unicast receiver socket
+  int retries = 0;
+  while (!setupUcastReceiver() && retries < 100)
+  {
+    LOG_ERROR("Cannot setup unicast receiver, try #" <<retries++);
+    sleep(retries);
+  }
+
+  // Now listen to ack msgs
+  char rxBuf[MCAST_BUFF_LEN];
+  struct sockaddr_storage rmt;
+  while (!mIsStopped)
+  {
+    socklen_t rmtLen = sizeof(rmt);
+    memset(rxBuf, 0, sizeof(rxBuf));
+    cout << "listening..." << endl;
+    int rxBytes = recvfrom(mUcastRXSocket, rxBuf, sizeof(rxBuf),
+                            0, (struct sockaddr*)&rmt, &rmtLen);
+
+    if (-1 == rxBytes)
+    {
+      LOG_ERROR("runUcastReceiver: recvfrom: "<< strerror(errno));
+      sleep(1);
+      continue;
+    }
+
+    cout << "Result: " << rxBuf << endl;
+  }
+
+  return 0;
+}
+
 bool SenderModule::shouldLoop() const
 {
   return mLoopInterval > 0.0;
+}
+
+void* SenderModule::rxThreadHelper(void* context)
+{
+  return ((SenderModule*)context)->runUcastReceiver();
 }

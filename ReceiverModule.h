@@ -25,6 +25,14 @@ private:
     */
    int joinMcastIface(int sock, const char* ifaceName = "");
    int joinMcastIfaceV6(int sock, const char* ifaceName = "");
+
+   /**
+    * Respond to the sender using udp unicast
+    * @param sender   - sender data
+    * @param ackMsg   - ack message
+    * @return true on sent success
+    */
+   bool sendAck(struct sockaddr_storage& sender, const string& ackMsg) const;
 };
 
 #endif /* MCAST_TOOL_MCASTRECEIVERMODULE_H_ */

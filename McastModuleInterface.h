@@ -24,7 +24,7 @@ public:
 protected:
   vector<IfaceData> mIfaces; // all interfaces to be listened/sent to
   string mMcastAddress;
-  int mMcastPort;
+  int mMcastPort, mAckPort;
 
 private:
   bool mIsIpV6;
@@ -36,6 +36,7 @@ inline McastModuleInterface::McastModuleInterface(const vector<IfaceData>& iface
 {
   string ipVer = (useIpV6)? "IPV6" : "IPV4";
   cout << "MCAST with " << ipVer << " " << mcastAddress << " port " << mcastPort << endl;
+  mAckPort = mMcastPort + 1;
 }
 
 inline bool McastModuleInterface::isIpV6() const

@@ -171,3 +171,29 @@ bool isDebugMode()
 {
   return g_debugMode;
 }
+
+int setReuseSocket(int sock)
+{
+  int opt = 1;
+
+  // Reuse address
+  int res = setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+  if (0 > res)
+  {
+    LOG_ERROR("commonSetupSocketFd[ "<< sock
+        << " ] sockopt SO_REUSEADDR: " << strerror(errno));
+    return -1;
+  }
+
+  // Reuse port
+  opt = 1;
+  res = setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt));
+  if (0 > res)
+  {
+    LOG_ERROR("commonSetupSocketFd[ "<< sock
+            << " ] sockopt SO_REUSEPORT: " << strerror(errno));
+    return -1;
+  }
+
+  return 0;
+}

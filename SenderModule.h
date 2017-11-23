@@ -25,6 +25,12 @@ private:
   bool setMcastWithIfaceName(int fd, const char* ifaceName);
   bool setMcastWithV6IfaceName(int fd, const char* ifaceName);
 
+  /**
+   * Setup unicast receiver socket
+   * @return true if success
+   */
+  bool setupUcastReceiver();
+
   // true if should send message in loop
   bool shouldLoop() const;
 
@@ -32,6 +38,15 @@ private:
   bool mIsLoopBackOn;
   float mLoopInterval; // loop micro seconds, -1 if send once
   string mMcastSingleAddress;
+  int mUcastRXSocket;
+
+// multi thread area -----------------------------
+private:
+  bool mIsStopped;
+public:
+  static void* rxThreadHelper(void* context);
+  void* runUcastReceiver();
+// -----------------------------------------------
 };
 
 #endif /* MCAST_TOOL_MCASTSENDERMODULE_H_ */

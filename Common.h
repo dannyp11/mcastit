@@ -36,6 +36,7 @@ using std::set;
 using std::map;
 
 #define MCAST_BUFF_LEN    (1024)  // message length
+#define ACK_SIGNATURE     "-MCAST-ACK" // append to make the ack message
 
 // print out error message to stderr
 #define LOG_ERROR(msg) \
@@ -86,6 +87,13 @@ int getIfaceIPFromIfaceName(const string& ifaceName, vector<string>& ifaceIpAdre
 int createSocket(bool isIpV6 = false);
 
 /**
+ * Enable reuse address and port on socket
+ * @param sock   - input socket
+ * @return 0 on success, <0 on error
+ */
+int setReuseSocket(int sock);
+
+/**
  * Clear up internal data from Common.cpp
  */
 void cleanupCommon();
@@ -95,10 +103,5 @@ void cleanupCommon();
  */
 void setDebugMode(bool enable = true);
 bool isDebugMode();
-
-/**
- * Determine if string is an IP address
- */
-bool isValidIpAddress(const char *ipAddress, bool useIpV6 = false);
 
 #endif /*COMMON_H_*/
