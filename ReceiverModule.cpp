@@ -155,7 +155,7 @@ bool ReceiverModule::run()
       // Build response message
       string responseMsg;
       encodeAckMessage(buffer, responseMsg);
-      if (!unicastMessage(mUnicastSenderSock, sender, responseMsg, isIpV6()))
+      if (!unicastMessage(mUnicastSenderSock, sender, responseMsg))
       {
         LOG_ERROR("sending ack message to " << senderIp);
       }

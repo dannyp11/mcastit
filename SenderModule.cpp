@@ -1,11 +1,11 @@
 #include "SenderModule.h"
 
 SenderModule::SenderModule(const vector<IfaceData>& ifaces, const string& mcastAddress,
-    int mcastPort, bool loopbackOn, bool useIpV6, float loopInterval) :
+    int mcastPort, int nLoopbackIfaces, bool useIpV6, float loopInterval) :
     McastModuleInterface(ifaces, mcastAddress, mcastPort, useIpV6),
-    mIsLoopBackOn(loopbackOn), mLoopInterval(loopInterval)
+    mLoopbackCount(nLoopbackIfaces), mLoopInterval(loopInterval)
 {
-  string loopMsg = (mIsLoopBackOn) ? "with" : "without";
+  string loopMsg = (nLoopbackIfaces>=0) ? "with" : "without";
   cout << "Sending " << loopMsg << " loopback";
   if (shouldLoop())
   {
@@ -77,8 +77,12 @@ void* SenderModule::runUcastReceiver()
     timeout.tv_usec = 1;
 
     int numReady = select(maxFd + 1, &listenSet, NULL, NULL, &timeout);
-    if (numReady == 0)
+    if (numReady <= 0)
     {
+      if (numReady<0)
+      {
+        LOG_ERROR("select: " << strerror(errno));
+      }
       continue;
     }
 
@@ -246,12 +250,12 @@ bool SenderModule::init()
     if (isIpV6())
     {
       setMcastOk = associateMcastV6WithIfaceName(mIfaces[i].sockFd,
-          mIfaces[i].ifaceName.c_str(), mIsLoopBackOn);
+          mIfaces[i].ifaceName.c_str(), mLoopbackCount<0 || (int)i < mLoopbackCount);
     }
     else
     {
       setMcastOk = associateMcastWithIfaceName(mIfaces[i].sockFd,
-          mIfaces[i].ifaceName.c_str(), mIsLoopBackOn);
+          mIfaces[i].ifaceName.c_str(), mLoopbackCount<0 || (int)i < mLoopbackCount);
     }
 
     if (!setMcastOk)

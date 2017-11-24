@@ -221,10 +221,10 @@ bool decodeAckMessage(const string& message, string& resultMsg)
   return true;
 }
 
-bool unicastMessage(int sock, struct sockaddr_storage& target, const string& msg, bool isIpV6)
+bool unicastMessage(int sock, struct sockaddr_storage& target, const string& msg)
 {
   int sendBytes = -1;
-  if (!isIpV6)
+  if (target.ss_family == AF_INET)
   {
     // repond in ipV4
     struct sockaddr_in *sender_addr = (struct sockaddr_in*) &target;

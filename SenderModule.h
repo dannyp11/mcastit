@@ -10,7 +10,7 @@ class SenderModule: public McastModuleInterface
 {
 public:
   SenderModule(const vector<IfaceData>& ifaces, const string& mcastAddress,
-      int mcastPort, bool loopbackOn, bool useIpV6, float loopInterval);
+      int mcastPort, int nLoopbackIfaces, bool useIpV6, float loopInterval);
   virtual ~SenderModule() {}
   bool run();
 
@@ -38,7 +38,7 @@ private:
   bool shouldLoop() const;
 
 private:
-  bool mIsLoopBackOn;
+  int mLoopbackCount;
   float mLoopInterval; // loop micro seconds, -1 if send once
   string mMcastSingleAddress;
   int mSenderPort;

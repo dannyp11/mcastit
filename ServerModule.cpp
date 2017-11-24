@@ -1,8 +1,8 @@
 #include "ServerModule.h"
 
 ServerModule::ServerModule(const vector<IfaceData>& ifaces, const string& mcastAddress,
-    int mcastPort, bool loopbackOn, bool useIpV6, float loopInterval):
-    SenderModule(ifaces, mcastAddress, mcastPort, loopbackOn, useIpV6, loopInterval),
+    int mcastPort, int nLoopbackIfaces, bool useIpV6, float loopInterval):
+    SenderModule(ifaces, mcastAddress, mcastPort, nLoopbackIfaces, useIpV6, loopInterval),
     mMcastListenSock(-1)
 {
   mMcastSendPort = mMcastPort + 10;
@@ -196,7 +196,7 @@ bool ServerModule::run()
       // Build response message
       string responseMsg;
       encodeAckMessage(buffer, responseMsg);
-      if (!unicastMessage(mUnicastSenderSock, sender, responseMsg, isIpV6()))
+      if (!unicastMessage(mUnicastSenderSock, sender, responseMsg))
       {
         LOG_ERROR("sending ack message to " << senderIp);
       }

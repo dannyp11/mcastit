@@ -7,7 +7,7 @@ class ServerModule: public SenderModule
 {
 public:
   ServerModule(const vector<IfaceData>& ifaces, const string& mcastAddress,
-      int mcastPort, bool loopbackOn, bool useIpV6, float loopInterval);
+      int mcastPort, int nLoopbackIfaces, bool useIpV6, float loopInterval);
   virtual ~ServerModule();
   bool run();
 

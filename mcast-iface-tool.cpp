@@ -37,7 +37,7 @@ static void usage(int /*argc*/, char * argv[])
       << "    -s                 server mode: both listen and send periodic messages" << endl
       << "                        use -i to specify interval, default is " << DEFAULT_SERVER_INTERVAL
                                  << " second" << endl
-      << "    -o                 turn off loop back on sender" << endl
+      << "    -o {n}             turn on loop back on the first n interfaces, default: all" << endl
       << "    -h                 This message, (version " __DATE__ << " " << __TIME__ << ")" << endl << endl;
 
   exit(1);
@@ -91,7 +91,7 @@ static void errorHandler(int signo)
 int main(int argc, char** argv)
 {
   ModuleMode mode = SENDER;
-  bool loopBackOn = true;
+  int nLoopbackInterfaces = -1;
   bool useIPv6 = false;
   bool useDefaultIp = true;
   string mcastAddress = DEFAULT_MCAST_ADDRESS_V4;
@@ -102,7 +102,7 @@ int main(int argc, char** argv)
   g_ifaces.clear();
 
   int command = -1;
-  while ((command = getopt(argc, argv, "sD6lom:p:i:h")) != -1)
+  while ((command = getopt(argc, argv, "sD6lo:m:p:i:h")) != -1)
   {
     switch (command)
     {
@@ -110,7 +110,7 @@ int main(int argc, char** argv)
       useIPv6 = true;
       break;
     case 'o':
-      loopBackOn = false;
+      nLoopbackInterfaces = atoi(optarg);
       break;
     case 'm':
       mcastAddress = optarg;
@@ -223,12 +223,12 @@ int main(int argc, char** argv)
   case SENDER:
   {
     g_McastModule = new SenderModule(g_ifaces, mcastAddress, mcastPort,
-        loopBackOn, useIPv6, sendInterval);
+        nLoopbackInterfaces, useIPv6, sendInterval);
   }
     break;
   case SERVER:
   {
-    g_McastModule = new ServerModule(g_ifaces, mcastAddress, mcastPort, loopBackOn, useIPv6,
+    g_McastModule = new ServerModule(g_ifaces, mcastAddress, mcastPort, nLoopbackInterfaces, useIPv6,
         sendInterval);
   }
     break;
