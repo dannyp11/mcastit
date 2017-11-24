@@ -22,6 +22,29 @@ public:
   bool isIpV6() const;
 
 protected:
+  /**
+   * Associate ifaceName to multicast address
+   * If ifacename is empty, bind with kernel determined interface
+   *
+   * @param fd        - udp socket that needs binding
+   * @param ifaceName - name of interface
+   * @param isLoopBack - turn on loopback sending
+   */
+  bool associateMcastWithIfaceName(int fd, const char* ifaceName, bool isLoopBack = false);
+  bool associateMcastV6WithIfaceName(int fd, const char* ifaceName, bool isLoopBack = false);
+
+  /**
+   * Join multicast on socket with interface ifaceName
+   * If ifaceName is empty, join to generic interface determined by kernel
+   *
+   * @param sock       - sock fd to join
+   * @param ifaceName  - interface name
+   * @return 0 on success
+   */
+  int joinMcastIface(int sock, const char* ifaceName = "");
+  int joinMcastIfaceV6(int sock, const char* ifaceName = "");
+
+protected:
   vector<IfaceData> mIfaces; // all interfaces to be listened/sent to
   string mMcastAddress;
   int mMcastPort, mAckPort;
@@ -29,18 +52,4 @@ protected:
 private:
   bool mIsIpV6;
 };
-
-inline McastModuleInterface::McastModuleInterface(const vector<IfaceData>& ifaces,
-    const string& mcastAddress, int mcastPort, bool useIpV6) :
-    mIfaces(ifaces), mMcastAddress(mcastAddress), mMcastPort(mcastPort), mIsIpV6(useIpV6)
-{
-  string ipVer = (useIpV6)? "IPV6" : "IPV4";
-  cout << "MCAST with " << ipVer << " " << mcastAddress << " port " << mcastPort << endl;
-  mAckPort = mMcastPort + 1;
-}
-
-inline bool McastModuleInterface::isIpV6() const
-{
-  return mIsIpV6;
-}
 #endif /* MCAST_TOOL_MCASTMODULEINTERFACE_H_ */

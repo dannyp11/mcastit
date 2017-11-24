@@ -19,26 +19,11 @@ SenderModule::SenderModule(const vector<IfaceData>& ifaces, const string& mcastA
 
 bool SenderModule::run()
 {
-  /*
-   * First, setup mcast for all interfaces
-   */
-  for (unsigned i = 0; i < mIfaces.size(); ++i)
+  bool retVal = true;
+  if (!init())
   {
-    bool setMcastOk;
-    if (isIpV6())
-    {
-      setMcastOk = setMcastWithV6IfaceName(mIfaces[i].sockFd, mIfaces[i].ifaceName.c_str());
-    }
-    else
-    {
-      setMcastOk = setMcastWithIfaceName(mIfaces[i].sockFd, mIfaces[i].ifaceName.c_str());
-    }
-
-    if (!setMcastOk)
-    {
-      LOG_ERROR("Setting mcast for " << mIfaces[i]);
-      return false;
-    }
+    LOG_ERROR("Error initing sender module");
+    return false;
   }
 
   // Spawn listener thread
@@ -54,230 +39,16 @@ bool SenderModule::run()
   }
   cout << "==============================================================" << endl;
 
-  // build addr struct
-  struct sockaddr_in addr;
-  addr.sin_family = AF_INET;
-  addr.sin_port = htons(mMcastPort);
-
-  struct sockaddr_in6 addr6;
-  addr6.sin6_family = AF_INET6;
-  addr6.sin6_port = htons(mMcastPort);
-
-  // setup mcast IP address
-  if (isIpV6())
+  if (!sendMcastMessages())
   {
-    if (inet_pton(AF_INET6, mMcastAddress.c_str(), &addr6.sin6_addr) != 1)
-    {
-      LOG_ERROR("Error parsing address for " << mMcastAddress);
-      return false;
-    }
+    LOG_ERROR("There's problem sending in SenderModule");
+    retVal = false;
   }
-  else
-  {
-    addr.sin_addr.s_addr = inet_addr(mMcastAddress.c_str());
-  }
-
-  const string dmsg = "<Sender info:";
-  int msgSeqNumber = 1;
-
-  do
-  {
-    char msgBuf[MCAST_BUFF_LEN];
-    for (unsigned i = 0; i < mIfaces.size(); ++i)
-    {
-      const IfaceData ifaceData = mIfaces[i];
-      int fd = ifaceData.sockFd;
-
-      // build message
-      memset(msgBuf, 0 ,sizeof(msgBuf));
-      if (shouldLoop())
-      {
-        sprintf(msgBuf, "%4d ", msgSeqNumber);
-      }
-      sprintf(msgBuf, "%s%s %s>", msgBuf, dmsg.c_str(), ifaceData.toString().c_str());
-
-      // send message
-      int byteSent;
-      if (!isIpV6())
-      {
-        byteSent = sendto(fd, msgBuf, strlen(msgBuf) + 1,
-                    MSG_NOSIGNAL|MSG_DONTWAIT, (struct sockaddr *) &addr, sizeof(addr));
-      }
-      else
-      {
-        byteSent = sendto(fd, msgBuf, strlen(msgBuf) + 1,
-                    MSG_NOSIGNAL|MSG_DONTWAIT, (struct sockaddr *) &addr6, sizeof(addr6));
-      }
-
-      // Error check for sending message
-      if (0 > byteSent)
-      {
-        LOG_ERROR("sendto " << ifaceData << " :" << strerror(errno));
-        return false;
-      }
-      else
-      {
-        LOG_DEBUG("[SENT] " << ifaceData << " bytes: " << byteSent);
-      }
-    }
-
-    // loop interval
-    if (shouldLoop())
-    {
-      ++msgSeqNumber;
-      (void) usleep( (int)(mLoopInterval*1e6) );
-    }
-
-  } while (shouldLoop());
 
   // Allow ack listener for 3 seconds
   sleep(3);
   mIsStopped = true;
-  return true;
-}
-
-bool SenderModule::setMcastWithIfaceName(int fd, const char* ifaceName)
-{
-  // Set the TTL hop count
-  int opt = 6;
-  int res = setsockopt(fd, IPPROTO_IP, IP_MULTICAST_TTL, (void*) &opt, sizeof(opt));
-  if (0 > res)
-  {
-    LOG_ERROR("sockopt TTL: " << strerror(errno));
-    return false;
-  }
-
-  // Allow broadcast on this socket.
-  opt = 1;
-  res = setsockopt(fd, SOL_SOCKET, SO_BROADCAST, (void*) &opt, sizeof(opt));
-  if (0 > res)
-  {
-    LOG_ERROR("sockopt SO_BROADCAST: " << strerror(errno));
-    return false;
-  }
-
-  // Enable reuse ip/port
-  if (-1 == setReuseSocket(fd))
-  {
-    LOG_ERROR("sockopt cannot reuse socket " << fd);
-    return false;
-  }
-
-  // Enable loop back if set.
-  opt = mIsLoopBackOn;
-  res = setsockopt(fd, IPPROTO_IP, IP_MULTICAST_LOOP, (void*) &opt, sizeof(opt));
-  if (0 > res)
-  {
-    LOG_ERROR("sockopt IP_MULTICAST_LOOP: " << strerror(errno));
-    return false;
-  }
-
-  // Next, bind socket to a fix port
-  in_addr_t meSinAddr = htonl(INADDR_ANY);
-  vector<string> meIps;
-  if (0 == getIfaceIPFromIfaceName(ifaceName, meIps, false))
-  {
-    meSinAddr = inet_addr(meIps[0].c_str());
-  }
-
-  struct sockaddr_in me_addr;
-  memset((char*) &me_addr, 0, sizeof(me_addr));
-  me_addr.sin_family = AF_INET;
-  me_addr.sin_port = htons(mSenderPort);
-  me_addr.sin_addr.s_addr = meSinAddr;
-  if (-1 == ::bind(fd, (struct sockaddr*)&me_addr, sizeof(me_addr)))
-  {
-    LOG_ERROR("sockopt bind: " << strerror(errno));
-    return false;
-  }
-
-  // If iface name specified, set iface name for the socket
-  if (0 < strlen(ifaceName))
-  {
-    struct ip_mreqn ifaddrn;
-    memset(&ifaddrn, 0, sizeof(ifaddrn));
-
-    ifaddrn.imr_ifindex = if_nametoindex(ifaceName);
-    if (0 != (res = setsockopt(fd, IPPROTO_IP, IP_MULTICAST_IF, &ifaddrn, sizeof(ifaddrn))))
-    {
-      LOG_ERROR("sockopt IP_MULTICAST_IF: " << strerror(errno));
-    }
-  }
-
-  return true;
-}
-
-bool SenderModule::setMcastWithV6IfaceName(int fd, const char* ifaceName)
-{
-  // Set the TTL hop count
-  int opt = 6;
-  int res = setsockopt(fd, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, (void*) &opt, sizeof(opt));
-  if (0 > res)
-  {
-    LOG_ERROR("sockopt TTL: " << strerror(errno));
-    return false;
-  }
-
-  // Allow broadcast on this socket.
-  opt = 1;
-  res = setsockopt(fd, SOL_SOCKET, SO_BROADCAST, (void*) &opt, sizeof(opt));
-  if (0 > res)
-  {
-    LOG_ERROR("sockopt SO_BROADCAST: " << strerror(errno));
-    return false;
-  }
-
-  // Enable reuse ip/port
-  if (-1 == setReuseSocket(fd))
-  {
-    LOG_ERROR("sockopt cannot reuse socket " << fd);
-    return false;
-  }
-
-  // Enable loop back if set.
-  opt = mIsLoopBackOn;
-  res = setsockopt(fd, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, (void*) &opt, sizeof(opt));
-  if (0 > res)
-  {
-    LOG_ERROR("sockopt IPV6_MULTICAST_LOOP: " << strerror(errno));
-    return false;
-  }
-
-  // Bind the socket to the multicast port.
-  struct sockaddr_in6 bindAddr6;
-  memset(&bindAddr6, 0, sizeof(bindAddr6));
-
-  vector<string> meIps;
-  if (0 == getIfaceIPFromIfaceName(ifaceName, meIps, true))
-  {
-    if (1 != inet_pton(AF_INET6, meIps[0].c_str(), &(bindAddr6.sin6_addr)))
-    {
-      LOG_ERROR("Error parsing address for " << mMcastAddress);
-      return -1;
-    }
-  }
-
-  bindAddr6.sin6_family = AF_INET6;
-  bindAddr6.sin6_port = htons(mSenderPort);
-  res = ::bind(fd, (struct sockaddr *) &bindAddr6, sizeof(bindAddr6));
-  if (0 > res)
-  {
-    LOG_ERROR("bind: " << strerror(errno));
-    return -1;
-  }
-
-  // If iface name specified, set iface name for the socket
-  if (0 < strlen(ifaceName))
-  {
-    unsigned ifIndex = if_nametoindex(ifaceName);
-    if (0 != (res = setsockopt(fd, IPPROTO_IPV6, IPV6_MULTICAST_IF, &ifIndex, sizeof(ifIndex))))
-    {
-      LOG_ERROR("sockopt IPV6_MULTICAST_IF: " << strerror(errno));
-      return false;
-    }
-  }
-
-  return true;
+  return retVal;
 }
 
 void* SenderModule::runUcastReceiver()
@@ -377,7 +148,118 @@ bool SenderModule::shouldLoop() const
   return mLoopInterval > 0.0;
 }
 
+bool SenderModule::sendMcastMessages(int port)
+{
+  // build addr struct
+  port = (-1 == port)? mMcastPort: port;
+  struct sockaddr_in addr;
+  addr.sin_family = AF_INET;
+  addr.sin_port = htons(port);
+
+  struct sockaddr_in6 addr6;
+  addr6.sin6_family = AF_INET6;
+  addr6.sin6_port = htons(port);
+
+  // setup mcast IP address
+  if (isIpV6())
+  {
+    if (inet_pton(AF_INET6, mMcastAddress.c_str(), &addr6.sin6_addr) != 1)
+    {
+      LOG_ERROR("Error parsing address for " << mMcastAddress);
+      return false;
+    }
+  }
+  else
+  {
+    addr.sin_addr.s_addr = inet_addr(mMcastAddress.c_str());
+  }
+
+  const string dmsg = "<Sender info:";
+  int msgSeqNumber = 1;
+
+  do
+  {
+    char msgBuf[MCAST_BUFF_LEN];
+    for (unsigned i = 0; i < mIfaces.size(); ++i)
+    {
+      const IfaceData ifaceData = mIfaces[i];
+      int fd = ifaceData.sockFd;
+
+      // build message
+      memset(msgBuf, 0 ,sizeof(msgBuf));
+      if (shouldLoop())
+      {
+        sprintf(msgBuf, "%4d ", msgSeqNumber);
+      }
+      sprintf(msgBuf, "%s%s %s>", msgBuf, dmsg.c_str(), ifaceData.toString().c_str());
+
+      // send message
+      int byteSent;
+      if (!isIpV6())
+      {
+        byteSent = sendto(fd, msgBuf, strlen(msgBuf) + 1,
+                    MSG_NOSIGNAL|MSG_DONTWAIT, (struct sockaddr *) &addr, sizeof(addr));
+      }
+      else
+      {
+        byteSent = sendto(fd, msgBuf, strlen(msgBuf) + 1,
+                    MSG_NOSIGNAL|MSG_DONTWAIT, (struct sockaddr *) &addr6, sizeof(addr6));
+      }
+
+      // Error check for sending message
+      if (0 > byteSent)
+      {
+        LOG_ERROR("sendto " << ifaceData << " :" << strerror(errno));
+        return false;
+      }
+      else
+      {
+        LOG_DEBUG("[SENT] " << ifaceData << " bytes: " << byteSent);
+      }
+    }
+
+    // loop interval
+    if (shouldLoop())
+    {
+      ++msgSeqNumber;
+      (void) usleep( (int)(mLoopInterval*1e6) );
+    }
+
+  } while (shouldLoop());
+
+  return true;
+}
+
 void* SenderModule::rxThreadHelper(void* context)
 {
   return ((SenderModule*)context)->runUcastReceiver();
+}
+
+bool SenderModule::init()
+{
+  /*
+   * First, setup mcast for all interfaces
+   */
+  for (unsigned i = 0; i < mIfaces.size(); ++i)
+  {
+    bool setMcastOk;
+    if (isIpV6())
+    {
+      setMcastOk = associateMcastV6WithIfaceName(mIfaces[i].sockFd,
+          mIfaces[i].ifaceName.c_str(), mIsLoopBackOn);
+    }
+    else
+    {
+      setMcastOk = associateMcastWithIfaceName(mIfaces[i].sockFd,
+          mIfaces[i].ifaceName.c_str(), mIsLoopBackOn);
+    }
+
+    if (!setMcastOk)
+    {
+      LOG_ERROR("Setting mcast for " << mIfaces[i]);
+      return false;
+    }
+  }
+
+  return true;
 }

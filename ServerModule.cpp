@@ -1,34 +1,36 @@
-#include "ReceiverModule.h"
+#include "ServerModule.h"
 
-ReceiverModule::ReceiverModule(const vector<IfaceData>& ifaces,
-    const string& mcastAddress, int mcastPort, bool useIpV6) :
-    McastModuleInterface(ifaces, mcastAddress, mcastPort, useIpV6)
+ServerModule::ServerModule(const vector<IfaceData>& ifaces, const string& mcastAddress,
+    int mcastPort, bool loopbackOn, bool useIpV6, float loopInterval):
+    SenderModule(ifaces, mcastAddress, mcastPort, loopbackOn, useIpV6, loopInterval),
+    mMcastListenSock(-1)
 {
+  mMcastSendPort = mMcastPort + 10;
   mUnicastSenderSock = -1;
+  cout << "Periodical send to port " << mMcastSendPort << endl;
 }
 
-ReceiverModule::~ReceiverModule()
+bool ServerModule::run()
 {
-  ::close(mUnicastSenderSock);
-}
+  // Init RX socket
+  mMcastListenSock = createSocket(isIpV6());
+  if (-1 == mMcastListenSock)
+  {
+    LOG_ERROR("Cannot create listener socket");
+    return false;
+  }
 
-bool ReceiverModule::run()
-{
-  int maxSockD = -1;
-
-  cout << "Listening ..."<< endl;
   for (unsigned i = 0; i < mIfaces.size(); ++i)
   {
-    int fd = mIfaces[i].sockFd;
     int setOk;
 
     if (isIpV6())
     {
-      setOk = joinMcastIfaceV6(fd, mIfaces[i].ifaceName.c_str());
+      setOk = joinMcastIfaceV6(mMcastListenSock, mIfaces[i].ifaceName.c_str());
     }
     else
     {
-      setOk = joinMcastIface(fd, mIfaces[i].ifaceName.c_str());
+      setOk = joinMcastIface(mMcastListenSock, mIfaces[i].ifaceName.c_str());
     }
 
     if (setOk != 0)
@@ -40,8 +42,24 @@ bool ReceiverModule::run()
     {
       cout << "Interface " << mIfaces[i] << " [OK]" << endl;
     }
+  }
 
-    maxSockD = (maxSockD < fd) ? fd : maxSockD;
+  // Init all sender interfaces
+  if (!SenderModule::init())
+  {
+    return false;
+  }
+
+  // Spawn periodical sender
+  pthread_t txThread;
+  if (0 != pthread_create(&txThread, NULL, &ServerModule::txThreadHelper, this))
+  {
+    LOG_ERROR("Cannot spawn listener thread");
+    return false;
+  }
+  else
+  {
+    cout << "Periodic sender thread started [OK]" << endl;
   }
 
   // Finally initialize unicast sender
@@ -56,29 +74,45 @@ bool ReceiverModule::run()
     LOG_ERROR("Cannot set reuse socket");
     return false;
   }
-  maxSockD = (maxSockD < mUnicastSenderSock) ? mUnicastSenderSock : maxSockD;
+
+  // Bind the unicast socket
   cout << "==============================================================" << endl;
 
-  /**
-   * Setup fdset
-   */
+  //-----------------------------------------------------------------------
+  //
+  // now prepare for select function
+  //
+  int maxSockFd = mMcastListenSock;
+  for (unsigned i = 0; i < mIfaces.size(); ++i)
+  {
+    maxSockFd = (maxSockFd < mIfaces[i].sockFd)? mIfaces[i].sockFd : maxSockFd;
+  }
+
   struct timeval timeout;
   fd_set rfds;
   char buffer[MCAST_BUFF_LEN];
+  //-----------------------------------------------------------------------
+
+  // Main select loop -----------------------------------------------------
   while (1)
   {
     FD_ZERO(&rfds);
+    FD_SET(mMcastListenSock, &rfds);
+    FD_SET(mUnicastSenderSock, &rfds);
     for (unsigned i = 0; i < mIfaces.size(); ++i)
     {
       FD_SET(mIfaces[i].sockFd, &rfds);
     }
-    FD_SET(mUnicastSenderSock, &rfds);
 
     timeout.tv_sec = 1;
     timeout.tv_usec = 1;
-    int numReady = select(maxSockD + 1, &rfds, NULL, NULL, &timeout);
+    int numReady = select(maxSockFd + 1, &rfds, NULL, NULL, &timeout);
     if (numReady <= 0)
     {
+      if (-1 == numReady)
+      {
+        LOG_ERROR("select: " << strerror(errno));
+      }
       continue;
     }
 
@@ -86,15 +120,23 @@ bool ReceiverModule::run()
     for (int i = 0; i < numReady; ++i)
     {
       // Retrieve the fd that has data
-      int fd = mUnicastSenderSock;
-      if (!FD_ISSET(fd, &rfds))
+      IfaceData ifaceData;
+      int fd = -1;
+      if (FD_ISSET(mUnicastSenderSock, &rfds))
+      {
+        fd = mUnicastSenderSock;
+      }
+      else if (FD_ISSET(mMcastListenSock, &rfds))
+      {
+        fd = mMcastListenSock;
+      }
+      else
       {
         for (unsigned ii = 0; ii < mIfaces.size(); ++ii)
         {
           fd = mIfaces[ii].sockFd;
           if (FD_ISSET(fd, &rfds))
           {
-            FD_CLR(fd, &rfds);
             break;
           }
         }
@@ -151,7 +193,6 @@ bool ReceiverModule::run()
         }
       }
 
-
       // Build response message
       string responseMsg;
       encodeAckMessage(buffer, responseMsg);
@@ -165,6 +206,24 @@ bool ReceiverModule::run()
       break;
     }
   }
+  // ----------------------------------------------------------------------
 
   return true;
+}
+
+ServerModule::~ServerModule()
+{
+  ::close(mMcastListenSock);
+  ::close(mUnicastSenderSock);
+}
+
+void* ServerModule::txThreadHelper(void* context)
+{
+  static int randNum = 1;
+  ServerModule* module = (ServerModule*)context;
+  if (module->sendMcastMessages(module->mMcastSendPort))
+  {
+    return 0;
+  }
+  return &randNum;
 }

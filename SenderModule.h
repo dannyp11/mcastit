@@ -19,17 +19,21 @@ public:
    */
   void* runUcastReceiver();
 
-private:
+protected:
   /**
-   * Associate ifaceName to multicast address
-   * If ifacename is empty, bind with kernel determined interface
-   *
-   * @param fd        - udp socket that needs binding
-   * @param ifaceName - name of interface
+   * Init all interfaces
+   * @return true on success
    */
-  bool setMcastWithIfaceName(int fd, const char* ifaceName);
-  bool setMcastWithV6IfaceName(int fd, const char* ifaceName);
+  bool init();
 
+  /**
+   * Main sender function
+   * @param port - the port to send to, set -1 if want to use mMcastPort
+   * @return true on success
+   */
+  bool sendMcastMessages(int port = -1);
+
+private:
   // true if should send message in loop
   bool shouldLoop() const;
 

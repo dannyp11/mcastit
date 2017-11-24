@@ -74,7 +74,7 @@ static int common_init()
 int createSocket(bool isIpV6)
 {
   int sockFamily = (isIpV6) ? AF_INET6 : AF_INET;
-  return socket(sockFamily, SOCK_DGRAM, 0);
+  return socket(sockFamily, SOCK_DGRAM|SOCK_CLOEXEC, 0);
 }
 
 int getIfaceIPFromIfaceName(const string& ifaceName, vector<string>& ifaceIpAdresses, bool isIpV6)
@@ -218,5 +218,42 @@ bool decodeAckMessage(const string& message, string& resultMsg)
   // Good, now trim the ack sig from message
   resultMsg = message.substr(0, message.size() - ACK_SIGNATURE.size());
 
+  return true;
+}
+
+bool unicastMessage(int sock, struct sockaddr_storage& target, const string& msg, bool isIpV6)
+{
+  int sendBytes = -1;
+  if (!isIpV6)
+  {
+    // repond in ipV4
+    struct sockaddr_in *sender_addr = (struct sockaddr_in*) &target;
+    socklen_t senderLen = sizeof(*sender_addr);
+
+    // No need to bind since there's no expected response to this module
+    int msgLen = msg.length() + 1;
+    if (msgLen != (sendBytes = sendto(sock, msg.c_str(), msgLen,
+                                      0, (struct sockaddr*)sender_addr, senderLen)))
+    {
+      LOG_ERROR("cannot sendto " << sock << ": " << strerror(errno));
+      return false;
+    }
+  }
+  else
+  {
+    struct sockaddr_in6 *sender_addr = (struct sockaddr_in6*) &target;
+    int senderLen = sizeof(*sender_addr);
+
+    // No need to bind since there's no expected response to this module
+    int msgLen = msg.length() + 1;
+    if (msgLen != (sendBytes = sendto(sock, msg.c_str(), msgLen,
+                                      0, (struct sockaddr*) sender_addr, senderLen)))
+    {
+      LOG_ERROR("cannot sendto: " << strerror(errno));
+      return false;
+    }
+  }
+
+  LOG_DEBUG("[OK] sent: " << sendBytes << " bytes");
   return true;
 }

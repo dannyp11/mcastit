@@ -1,14 +1,23 @@
 #include "Common.h"
 #include "SenderModule.h"
 #include "ReceiverModule.h"
+#include "ServerModule.h"
 
 // Global vars
 #define DEFAULT_MCAST_ADDRESS_V4  "239.192.0.123"
 #define DEFAULT_MCAST_ADDRESS_V6  "FFFE::1:FF47:0"
 #define DEFAULT_MCAST_PORT        (12321)
+#define DEFAULT_SERVER_INTERVAL   (1)
 
 static vector<IfaceData> g_ifaces;
 static McastModuleInterface* g_McastModule = NULL;
+
+typedef enum _ModuleMode
+{
+  READER=0,
+  SENDER,
+  SERVER
+} ModuleMode;
 
 static void usage(int /*argc*/, char * argv[])
 {
@@ -25,6 +34,9 @@ static void usage(int /*argc*/, char * argv[])
 
       << "    -i {interval}      interval in seconds if send in loop" << endl
       << "    -l                 listen mode" << endl
+      << "    -s                 server mode: both listen and send periodic messages" << endl
+      << "                        use -i to specify interval, default is " << DEFAULT_SERVER_INTERVAL
+                                 << " second" << endl
       << "    -o                 turn off loop back on sender" << endl
       << "    -h                 This message, (version " __DATE__ << " " << __TIME__ << ")" << endl << endl;
 
@@ -39,7 +51,7 @@ static void cleanup()
   {
     uniqueFdSet.insert(g_ifaces[i].sockFd);
   }
-  
+
   for (set<int>::const_iterator setIt = uniqueFdSet.begin(); 
             setIt != uniqueFdSet.end(); ++setIt)
   {
@@ -78,7 +90,7 @@ static void errorHandler(int signo)
 
 int main(int argc, char** argv)
 {
-  bool listenMode = false;
+  ModuleMode mode = SENDER;
   bool loopBackOn = true;
   bool useIPv6 = false;
   bool useDefaultIp = true;
@@ -90,7 +102,7 @@ int main(int argc, char** argv)
   g_ifaces.clear();
 
   int command = -1;
-  while ((command = getopt(argc, argv, "D6lom:p:i:h")) != -1)
+  while ((command = getopt(argc, argv, "sD6lom:p:i:h")) != -1)
   {
     switch (command)
     {
@@ -108,10 +120,13 @@ int main(int argc, char** argv)
       mcastPort = atoi(optarg);
       break;
     case 'l':
-      listenMode = true;
+      mode = READER;
       break;
     case 'i':
       sendInterval = atof(optarg);
+      break;
+    case 's':
+      mode = SERVER;
       break;
     case 'D':
       cout << "Debug mode ON" << endl;
@@ -130,6 +145,17 @@ int main(int argc, char** argv)
   if (useIPv6 && useDefaultIp)
   {
     mcastAddress = DEFAULT_MCAST_ADDRESS_V6;
+  }
+
+  /*
+   * Setup server mode
+   */
+  if (mode == SERVER)
+  {
+    if (sendInterval < 0)
+    {
+      sendInterval = DEFAULT_SERVER_INTERVAL;
+    }
   }
 
   /*
@@ -152,14 +178,14 @@ int main(int argc, char** argv)
   {
     const string ifaceName = argv[i];
     vector<string> ifaceAddresses;
-    if (!listenMode || i == optind)
+    if (READER != mode || i == optind)
     {
       fd = createSocket(useIPv6);
     }
 
     if (-1 == fd)
     {
-      LOG_ERROR("Can't create socket for " << ifaceName);
+      LOG_ERROR("Can't create socket for " << ifaceName << " :" << strerror(errno));
       safeExit(1);
     }
 
@@ -188,29 +214,33 @@ int main(int argc, char** argv)
   /*
    * Now we can run the mode
    */
-  if (listenMode)
+  switch (mode) {
+  case READER:
   {
     g_McastModule = new ReceiverModule(g_ifaces, mcastAddress, mcastPort, useIPv6);
   }
-  else
+    break;
+  case SENDER:
   {
     g_McastModule = new SenderModule(g_ifaces, mcastAddress, mcastPort,
-                                                  loopBackOn, useIPv6, sendInterval);
+        loopBackOn, useIPv6, sendInterval);
+  }
+    break;
+  case SERVER:
+  {
+    g_McastModule = new ServerModule(g_ifaces, mcastAddress, mcastPort, loopBackOn, useIPv6,
+        sendInterval);
+  }
+    break;
+  default:
+    break;
   }
 
-  if (g_McastModule)
-  {
-    if (!g_McastModule->run())
-    {
-      cout << "Error running module, exiting..." << endl;
-      exitVal = 1;
-    }
-  }
-  else
-  {
-    cout << "Error spawning mcast module" << endl;
-    exitVal = 2;
-  }
+  if (!g_McastModule || !g_McastModule->run())
+   {
+     cout << "Error running module, exiting..." << endl;
+     safeExit(1);
+   }
 
   cleanup();
   return exitVal;

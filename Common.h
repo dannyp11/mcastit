@@ -118,4 +118,15 @@ bool isDebugMode();
 bool encodeAckMessage(const string& message, string& resultMsg);
 bool decodeAckMessage(const string& message, string& resultMsg);
 
+/**
+ * Send unicast message to target
+ * @param sock
+ * @param target
+ * @param msg
+ * @param isIpV6
+ * @return true if success
+ */
+bool unicastMessage(int sock, struct sockaddr_storage& target,
+    const string& msg, bool isIpV6);
+
 #endif /*COMMON_H_*/
