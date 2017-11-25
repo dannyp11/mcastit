@@ -7,6 +7,11 @@ LDFLAGS = -pthread
 ARCHFLAGS = 
 # Compiler flags ends ---------------------------------------------
 
+# Install data ----------------------------------------------------
+DESTDIR ?=/usr/local
+INSTALLDIR_BIN=$(DESTDIR)/bin/
+# -----------------------------------------------------------------
+
 # Config build structure ##########################################
 BIN = mcastit
 SRC = $(wildcard *.cpp)
@@ -19,6 +24,13 @@ all: $(BIN)
 	
 clean:
 	-rm -f $(OBJS) $(BIN)
+
+install: all
+	mkdir -p $(INSTALLDIR_BIN)
+	install $(BIN) $(INSTALLDIR_BIN)
+
+uninstall:
+	rm -f $(INSTALLDIR_BIN)/$(BIN)
 
 # Build code #######################################
 %.o:%.cpp
