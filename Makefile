@@ -1,9 +1,9 @@
 # Compiler flags -------------------------------------------------
 CXX ?=g++
 DEBUG = -Os
-CFLAGS = -rdynamic -Wall -Wextra -Werror $(DEBUG)
+CFLAGS = -Wall -Wextra -Werror $(DEBUG)
 IFLAGS = -I. 
-LDFLAGS = -pthread
+LDFLAGS = -pthread -rdynamic
 ARCHFLAGS = 
 # Compiler flags ends ---------------------------------------------
 
