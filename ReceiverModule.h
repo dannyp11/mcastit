@@ -10,7 +10,7 @@ class ReceiverModule: public McastModuleInterface
 {
 public:
    ReceiverModule(const vector<IfaceData>& ifaces,
-         const string& mcastAddress, int mcastPort, bool useIpV6);
+       const vector<string>& mcastAddresses, int mcastPort, bool useIpV6);
    virtual ~ReceiverModule();
    bool run();
 

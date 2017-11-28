@@ -1,8 +1,9 @@
 #include "ServerModule.h"
 
-ServerModule::ServerModule(const vector<IfaceData>& ifaces, const string& mcastAddress,
-    int mcastPort, int nLoopbackIfaces, bool useIpV6, float loopInterval):
-    SenderModule(ifaces, mcastAddress, mcastPort, nLoopbackIfaces, useIpV6, loopInterval),
+ServerModule::ServerModule(const vector<IfaceData>& ifaces,
+    const vector<string>& mcastAddresses, int mcastPort,
+    int nLoopbackIfaces, bool useIpV6, float loopInterval):
+    SenderModule(ifaces, mcastAddresses, mcastPort, nLoopbackIfaces, useIpV6, loopInterval),
     mMcastListenSock(-1)
 {
   mMcastSendPort = mMcastPort + 10;

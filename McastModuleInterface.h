@@ -9,7 +9,7 @@
 class McastModuleInterface
 {
 public:
-  McastModuleInterface(const vector<IfaceData>& ifaces, const string& mcastAddress,
+  McastModuleInterface(const vector<IfaceData>& ifaces, const vector<string>& mcastAddresses,
                        int mcastPort, bool useIpV6 = false);
   virtual ~McastModuleInterface() {}
 
@@ -46,7 +46,7 @@ protected:
 
 protected:
   vector<IfaceData> mIfaces; // all interfaces to be listened/sent to
-  string mMcastAddress;
+  vector<string> mMcastAddresses;
   int mMcastPort, mAckPort;
 
 private:

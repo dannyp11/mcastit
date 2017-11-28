@@ -94,7 +94,7 @@ int main(int argc, char** argv)
   int nLoopbackInterfaces = -1;
   bool useIPv6 = false;
   bool useDefaultIp = true;
-  string mcastAddress = DEFAULT_MCAST_ADDRESS_V4;
+  set<string> mcastAddresses;
   int mcastPort = DEFAULT_MCAST_PORT;
   int exitVal = 0;
   float sendInterval = -1;
@@ -113,7 +113,7 @@ int main(int argc, char** argv)
       nLoopbackInterfaces = atoi(optarg);
       break;
     case 'm':
-      mcastAddress = optarg;
+      mcastAddresses.insert(optarg);
       useDefaultIp = false;
       break;
     case 'p':
@@ -142,9 +142,16 @@ int main(int argc, char** argv)
   /*
    * Update arguments based on getopt
    */
-  if (useIPv6 && useDefaultIp)
+  if (useDefaultIp)
   {
-    mcastAddress = DEFAULT_MCAST_ADDRESS_V6;
+    if (useIPv6)
+    {
+      mcastAddresses.insert(DEFAULT_MCAST_ADDRESS_V6);
+    }
+    else
+    {
+      mcastAddresses.insert(DEFAULT_MCAST_ADDRESS_V4);
+    }
   }
 
   /*
@@ -214,21 +221,23 @@ int main(int argc, char** argv)
   /*
    * Now we can run the mode
    */
+  vector<string> mcastAddressesVec;
+  mcastAddressesVec.insert(mcastAddressesVec.end(), mcastAddresses.begin(), mcastAddresses.end());
   switch (mode) {
   case READER:
   {
-    g_McastModule = new ReceiverModule(g_ifaces, mcastAddress, mcastPort, useIPv6);
+    g_McastModule = new ReceiverModule(g_ifaces, mcastAddressesVec, mcastPort, useIPv6);
   }
     break;
   case SENDER:
   {
-    g_McastModule = new SenderModule(g_ifaces, mcastAddress, mcastPort,
+    g_McastModule = new SenderModule(g_ifaces, mcastAddressesVec, mcastPort,
         nLoopbackInterfaces, useIPv6, sendInterval);
   }
     break;
   case SERVER:
   {
-    g_McastModule = new ServerModule(g_ifaces, mcastAddress, mcastPort, nLoopbackInterfaces, useIPv6,
+    g_McastModule = new ServerModule(g_ifaces, mcastAddressesVec, mcastPort, nLoopbackInterfaces, useIPv6,
         sendInterval);
   }
     break;

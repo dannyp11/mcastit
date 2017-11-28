@@ -1,12 +1,22 @@
 #include "SenderModule.h"
 
-SenderModule::SenderModule(const vector<IfaceData>& ifaces, const string& mcastAddress,
-    int mcastPort, int nLoopbackIfaces, bool useIpV6, float loopInterval) :
-    McastModuleInterface(ifaces, mcastAddress, mcastPort, useIpV6),
+SenderModule::SenderModule(const vector<IfaceData>& ifaces,
+    const vector<string>& mcastAddresses, int mcastPort,
+    int nLoopbackIfaces, bool useIpV6, float loopInterval) :
+    McastModuleInterface(ifaces, mcastAddresses, mcastPort, useIpV6),
     mLoopbackCount(nLoopbackIfaces), mLoopInterval(loopInterval)
 {
-  string loopMsg = (nLoopbackIfaces>=0) ? "with" : "without";
-  cout << "Sending " << loopMsg << " loopback";
+  std::stringstream loopMsg;
+  if (nLoopbackIfaces>=0)
+  {
+    loopMsg << nLoopbackIfaces;
+  }
+  else
+  {
+    loopMsg << "all";
+  }
+  cout << "Sending with " << loopMsg.str() << " interface loopbacks";
+
   if (shouldLoop())
   {
     cout << " with interval " << mLoopInterval << " second(s)";
@@ -154,30 +164,41 @@ bool SenderModule::shouldLoop() const
 
 bool SenderModule::sendMcastMessages(int port)
 {
-  // build addr struct
+  // build addr struct vector
+  // if port is -1, use mcast port
   port = (-1 == port)? mMcastPort: port;
-  struct sockaddr_in addr;
-  addr.sin_family = AF_INET;
-  addr.sin_port = htons(port);
+  vector<struct sockaddr_in> addrVec;
+  vector<struct sockaddr_in6> addr6Vec;
 
-  struct sockaddr_in6 addr6;
-  addr6.sin6_family = AF_INET6;
-  addr6.sin6_port = htons(port);
-
-  // setup mcast IP address
-  if (isIpV6())
+  for (unsigned i = 0; i < mMcastAddresses.size(); ++i)
   {
-    if (inet_pton(AF_INET6, mMcastAddress.c_str(), &addr6.sin6_addr) != 1)
+    struct sockaddr_in addr;
+    struct sockaddr_in6 addr6;
+
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+
+    addr6.sin6_family = AF_INET6;
+    addr6.sin6_port = htons(port);
+
+    // setup mcast IP address
+    if (isIpV6())
     {
-      LOG_ERROR("Error parsing address for " << mMcastAddress);
-      return false;
+      if (inet_pton(AF_INET6, mMcastAddresses[i].c_str(), &addr6.sin6_addr) != 1)
+      {
+        LOG_ERROR("Error parsing address for " << mMcastAddresses[i]);
+        return false;
+      }
+      addr6Vec.push_back(addr6);
+    }
+    else
+    {
+      addr.sin_addr.s_addr = inet_addr(mMcastAddresses[i].c_str());
+      addrVec.push_back(addr);
     }
   }
-  else
-  {
-    addr.sin_addr.s_addr = inet_addr(mMcastAddress.c_str());
-  }
 
+  // build message
   const string dmsg = "<Sender info:";
   int msgSeqNumber = 1;
 
@@ -198,27 +219,32 @@ bool SenderModule::sendMcastMessages(int port)
       sprintf(msgBuf, "%s%s %s>", msgBuf, dmsg.c_str(), ifaceData.toString().c_str());
 
       // send message
-      int byteSent;
-      if (!isIpV6())
+      for (unsigned i = 0; i < addrVec.size() + addr6Vec.size(); ++i)
       {
-        byteSent = sendto(fd, msgBuf, strlen(msgBuf) + 1,
-                    MSG_NOSIGNAL|MSG_DONTWAIT, (struct sockaddr *) &addr, sizeof(addr));
-      }
-      else
-      {
-        byteSent = sendto(fd, msgBuf, strlen(msgBuf) + 1,
-                    MSG_NOSIGNAL|MSG_DONTWAIT, (struct sockaddr *) &addr6, sizeof(addr6));
-      }
+        const struct sockaddr_in& addr = addrVec[i];
+        const struct sockaddr_in6& addr6 = addr6Vec[i];
+        int byteSent;
+        if (!isIpV6())
+        {
+          byteSent = sendto(fd, msgBuf, strlen(msgBuf) + 1,
+                      MSG_NOSIGNAL|MSG_DONTWAIT, (struct sockaddr *) &addr, sizeof(addr));
+        }
+        else
+        {
+          byteSent = sendto(fd, msgBuf, strlen(msgBuf) + 1,
+                      MSG_NOSIGNAL|MSG_DONTWAIT, (struct sockaddr *) &addr6, sizeof(addr6));
+        }
 
-      // Error check for sending message
-      if (0 > byteSent)
-      {
-        LOG_ERROR("sendto " << ifaceData << " :" << strerror(errno));
-        return false;
-      }
-      else
-      {
-        LOG_DEBUG("[SENT] " << ifaceData << " bytes: " << byteSent);
+        // Error check for sending message
+        if (0 > byteSent)
+        {
+          LOG_ERROR("sendto " << ifaceData << " :" << strerror(errno));
+          return false;
+        }
+        else
+        {
+          LOG_DEBUG("[SENT] " << ifaceData << " bytes: " << byteSent);
+        }
       }
     }
 

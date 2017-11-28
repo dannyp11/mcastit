@@ -1,8 +1,8 @@
 #include "ReceiverModule.h"
 
 ReceiverModule::ReceiverModule(const vector<IfaceData>& ifaces,
-    const string& mcastAddress, int mcastPort, bool useIpV6) :
-    McastModuleInterface(ifaces, mcastAddress, mcastPort, useIpV6)
+    const vector<string>& mcastAddresses, int mcastPort, bool useIpV6) :
+    McastModuleInterface(ifaces, mcastAddresses, mcastPort, useIpV6)
 {
   mUnicastSenderSock = -1;
 }

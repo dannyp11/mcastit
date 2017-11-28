@@ -1,11 +1,28 @@
 #include "McastModuleInterface.h"
 
 McastModuleInterface::McastModuleInterface(const vector<IfaceData>& ifaces,
-    const string& mcastAddress, int mcastPort, bool useIpV6) :
-    mIfaces(ifaces), mMcastAddress(mcastAddress), mMcastPort(mcastPort), mIsIpV6(useIpV6)
+    const vector<string>& mcastAddresses, int mcastPort, bool useIpV6) :
+    mIfaces(ifaces), mMcastAddresses(mcastAddresses), mMcastPort(mcastPort), mIsIpV6(useIpV6)
 {
   string ipVer = (useIpV6)? "IPV6" : "IPV4";
-  cout << "MCAST with " << ipVer << " " << mcastAddress << " port " << mcastPort << endl;
+
+  // Print out all mcast addresses
+  std::stringstream stm;
+  stm << "(";
+  for (unsigned i = 0; i < mcastAddresses.size(); ++i)
+  {
+    if (0==i)
+    {
+      stm << mcastAddresses[i];
+    }
+    else
+    {
+      stm << "," << mcastAddresses[i];
+    }
+  }
+  stm << ")";
+
+  cout << "MCAST with " << ipVer << " " << stm.str() << " port " << mcastPort << endl;
   mAckPort = mMcastPort + 1;
 }
 
@@ -132,7 +149,7 @@ bool McastModuleInterface::associateMcastV6WithIfaceName(int fd,
   {
     if (1 != inet_pton(AF_INET6, meIps[0].c_str(), &(bindAddr6.sin6_addr)))
     {
-      LOG_ERROR("Error parsing address for " << mMcastAddress);
+      LOG_ERROR("Error parsing address for " << ifaceName);
       return -1;
     }
   }
@@ -194,25 +211,29 @@ int McastModuleInterface::joinMcastIface(int sock, const char* ifaceName)
 
   // If ifaceName is specified, bind directly to that iface,
   // otherwise bind to general interface
-  if (0 == strlen(ifaceName))
+  for (unsigned i = 0; i < mMcastAddresses.size(); ++i)
   {
-    struct ip_mreq mcastReq;
-    mcastReq.imr_multiaddr.s_addr = inet_addr(mMcastAddress.c_str());
-    mcastReq.imr_interface.s_addr = htonl(INADDR_ANY);
-    res = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void*) &mcastReq, sizeof(mcastReq));
-  }
-  else
-  {
-    struct ip_mreqn mcastReqn;
-    mcastReqn.imr_multiaddr.s_addr = inet_addr(mMcastAddress.c_str());
-    mcastReqn.imr_ifindex = if_nametoindex(ifaceName);
-    res = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void*) &mcastReqn, sizeof(mcastReqn));
-  }
+    const string& mcastAddress = mMcastAddresses[i];
+    if (0 == strlen(ifaceName))
+    {
+      struct ip_mreq mcastReq;
+      mcastReq.imr_multiaddr.s_addr = inet_addr(mcastAddress.c_str());
+      mcastReq.imr_interface.s_addr = htonl(INADDR_ANY);
+      res = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void*) &mcastReq, sizeof(mcastReq));
+    }
+    else
+    {
+      struct ip_mreqn mcastReqn;
+      mcastReqn.imr_multiaddr.s_addr = inet_addr(mcastAddress.c_str());
+      mcastReqn.imr_ifindex = if_nametoindex(ifaceName);
+      res = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void*) &mcastReqn, sizeof(mcastReqn));
+    }
 
-  if (0 != res)
-  {
-    printf("Error: join mcast group<%s> interface<%s>: %s\n",
-              mMcastAddress.c_str(), ifaceName, strerror(errno));
+    if (0 != res)
+    {
+      printf("Error: join mcast group<%s> interface<%s>: %s\n",
+          mcastAddress.c_str(), ifaceName, strerror(errno));
+    }
   }
 
   return res;
@@ -251,20 +272,24 @@ int McastModuleInterface::joinMcastIfaceV6(int sock, const char* ifaceName)
 
   // If ifaceName is specified, bind directly to that iface,
   // otherwise bind to general interface
-  struct ipv6_mreq mcastReq;
-  if (inet_pton(AF_INET6, mMcastAddress.c_str(), &mcastReq.ipv6mr_multiaddr) != 1)
+  for (unsigned i = 0; i < mMcastAddresses.size(); ++i)
   {
-    LOG_ERROR("Error parsing address for " << mMcastAddress);
-    return -1;
-  }
+    const string& mcastAddress = mMcastAddresses[i];
+    struct ipv6_mreq mcastReq;
+    if (inet_pton(AF_INET6, mcastAddress.c_str(), &mcastReq.ipv6mr_multiaddr) != 1)
+    {
+      LOG_ERROR("Error parsing address for " << mcastAddress);
+      return -1;
+    }
 
-  mcastReq.ipv6mr_interface = if_nametoindex(ifaceName); // no need to check since it will return 0 on error
-  res = setsockopt(sock, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, (void*) &mcastReq, sizeof(mcastReq));
+    mcastReq.ipv6mr_interface = if_nametoindex(ifaceName); // no need to check since it will return 0 on error
+    res = setsockopt(sock, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, (void*) &mcastReq, sizeof(mcastReq));
 
-  if (0 != res)
-  {
-    printf("ERR: join mcast GRP<%s> INF<%s> ERR<%s>\n", mMcastAddress.c_str(), ifaceName,
-        strerror(errno));
+    if (0 != res)
+    {
+      printf("ERR: join mcast GRP<%s> INF<%s> ERR<%s>\n", mcastAddress.c_str(), ifaceName,
+          strerror(errno));
+    }
   }
 
   return res;
