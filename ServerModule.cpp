@@ -14,7 +14,7 @@ ServerModule::ServerModule(const vector<IfaceData>& ifaces,
 bool ServerModule::run()
 {
   // Init RX socket
-  mMcastListenSock = createSocket(isIpV6());
+  mMcastListenSock = Common::createSocket(isIpV6());
   if (-1 == mMcastListenSock)
   {
     LOG_ERROR("Cannot create listener socket");
@@ -64,13 +64,13 @@ bool ServerModule::run()
   }
 
   // Finally initialize unicast sender
-  if (-1 == (mUnicastSenderSock = createSocket(isIpV6())))
+  if (-1 == (mUnicastSenderSock = Common::createSocket(isIpV6())))
   {
     LOG_ERROR("Cannot create socket");
     return false;
   }
 
-  if (-1 == setReuseSocket(mUnicastSenderSock))
+  if (-1 == Common::setReuseSocket(mUnicastSenderSock))
   {
     LOG_ERROR("Cannot set reuse socket");
     return false;
@@ -171,7 +171,7 @@ bool ServerModule::run()
 
       // print result message
       string decodedMsg;
-      if (decodeAckMessage(buffer, decodedMsg))
+      if (Common::decodeAckMessage(buffer, decodedMsg))
       {
         if (isIpV6())
         {
@@ -196,8 +196,8 @@ bool ServerModule::run()
 
       // Build response message
       string responseMsg;
-      encodeAckMessage(buffer, responseMsg);
-      if (!unicastMessage(mUnicastSenderSock, sender, responseMsg))
+      Common::encodeAckMessage(buffer, responseMsg);
+      if (!Common::unicastMessage(mUnicastSenderSock, sender, responseMsg))
       {
         LOG_ERROR("sending ack message to " << senderIp);
       }

@@ -61,7 +61,7 @@ static void cleanup()
     }
   }
   
-  cleanupCommon();
+  Common::cleanupCommon();
 }
 
 static void safeExit(int errCode = 0)
@@ -130,7 +130,7 @@ int main(int argc, char** argv)
       break;
     case 'D':
       cout << "Debug mode ON" << endl;
-      setDebugMode(true);
+      Common::setDebugMode(true);
       break;
     case 'h':
     default:
@@ -187,7 +187,7 @@ int main(int argc, char** argv)
     vector<string> ifaceAddresses;
     if (READER != mode || i == optind)
     {
-      fd = createSocket(useIPv6);
+      fd = Common::createSocket(useIPv6);
     }
 
     if (-1 == fd)
@@ -197,7 +197,7 @@ int main(int argc, char** argv)
     }
 
     // use interface name
-    if (0 != getIfaceIPFromIfaceName(ifaceName, ifaceAddresses, useIPv6))
+    if (0 != Common::getIfaceIPFromIfaceName(ifaceName, ifaceAddresses, useIPv6))
     {
       LOG_ERROR("Can't find interface IP address for " << ifaceName);
       safeExit(2);
@@ -208,7 +208,7 @@ int main(int argc, char** argv)
 
   if (0 == g_ifaces.size())
   {
-    int sock = createSocket(useIPv6);
+    int sock = Common::createSocket(useIPv6);
     if (sock < 0)
     {
       LOG_ERROR("Creating socket: " << strerror(errno));

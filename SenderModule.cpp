@@ -136,7 +136,7 @@ void* SenderModule::runUcastReceiver()
       }
 
       string decodedMsg;
-      if (decodeAckMessage(rxBuf, decodedMsg))
+      if (Common::decodeAckMessage(rxBuf, decodedMsg))
       {
         if (isIpV6())
         {

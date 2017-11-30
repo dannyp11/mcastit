@@ -53,7 +53,7 @@ bool McastModuleInterface::associateMcastWithIfaceName(int fd,
   }
 
   // Enable reuse ip/port
-  if (-1 == setReuseSocket(fd))
+  if (-1 == Common::setReuseSocket(fd))
   {
     LOG_ERROR("sockopt cannot reuse socket " << fd);
     return false;
@@ -71,7 +71,7 @@ bool McastModuleInterface::associateMcastWithIfaceName(int fd,
   // Next, bind socket to a fix port
   in_addr_t meSinAddr = htonl(INADDR_ANY);
   vector<string> meIps;
-  if (0 == getIfaceIPFromIfaceName(ifaceName, meIps, false))
+  if (0 == Common::getIfaceIPFromIfaceName(ifaceName, meIps, false))
   {
     meSinAddr = inet_addr(meIps[0].c_str());
   }
@@ -125,7 +125,7 @@ bool McastModuleInterface::associateMcastV6WithIfaceName(int fd,
   }
 
   // Enable reuse ip/port
-  if (-1 == setReuseSocket(fd))
+  if (-1 == Common::setReuseSocket(fd))
   {
     LOG_ERROR("sockopt cannot reuse socket " << fd);
     return false;
@@ -145,7 +145,7 @@ bool McastModuleInterface::associateMcastV6WithIfaceName(int fd,
   memset(&bindAddr6, 0, sizeof(bindAddr6));
 
   vector<string> meIps;
-  if (0 == getIfaceIPFromIfaceName(ifaceName, meIps, true))
+  if (0 == Common::getIfaceIPFromIfaceName(ifaceName, meIps, true))
   {
     if (1 != inet_pton(AF_INET6, meIps[0].c_str(), &(bindAddr6.sin6_addr)))
     {
@@ -189,7 +189,7 @@ int McastModuleInterface::joinMcastIface(int sock, const char* ifaceName)
   }
 
   // Let's set reuse port & address to on to allow multiple binds per host.
-  if (-1 == setReuseSocket(sock))
+  if (-1 == Common::setReuseSocket(sock))
   {
     LOG_ERROR("can't reuse socket");
     return -1;
@@ -251,7 +251,7 @@ int McastModuleInterface::joinMcastIfaceV6(int sock, const char* ifaceName)
   }
 
   // Let's set reuse port to on to allow multiple binds per host.
-  if (-1 == setReuseSocket(sock))
+  if (-1 == Common::setReuseSocket(sock))
   {
     LOG_ERROR("can't reuse socket");
     return -1;

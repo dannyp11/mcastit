@@ -71,13 +71,13 @@ static int common_init()
   return retVal;
 }
 
-int createSocket(bool isIpV6)
+int Common::createSocket(bool isIpV6)
 {
   int sockFamily = (isIpV6) ? AF_INET6 : AF_INET;
   return socket(sockFamily, SOCK_DGRAM|SOCK_CLOEXEC, 0);
 }
 
-int getIfaceIPFromIfaceName(const string& ifaceName, vector<string>& ifaceIpAdresses, bool isIpV6)
+int Common::getIfaceIPFromIfaceName(const string& ifaceName, vector<string>& ifaceIpAdresses, bool isIpV6)
 {
   ifaceIpAdresses.clear();
   if (!ifaceName.size())
@@ -162,21 +162,21 @@ std::ostream & operator<<(std::ostream &os, const IfaceData& iface)
   return os << iface.toString();
 }
 
-void cleanupCommon()
+void Common::cleanupCommon()
 {
 }
 
-void setDebugMode(bool enable)
+void Common::setDebugMode(bool enable)
 {
   g_debugMode = enable;
 }
 
-bool isDebugMode()
+bool Common::isDebugMode()
 {
   return g_debugMode;
 }
 
-int setReuseSocket(int sock)
+int Common::setReuseSocket(int sock)
 {
   int opt = 1;
   // Reuse address
@@ -191,7 +191,7 @@ int setReuseSocket(int sock)
   return 0;
 }
 
-bool encodeAckMessage(const string& message, string& resultMsg)
+bool Common::encodeAckMessage(const string& message, string& resultMsg)
 {
   std::stringstream stm;
   stm << message << " - " << getpid() << ACK_SIGNATURE;
@@ -199,9 +199,18 @@ bool encodeAckMessage(const string& message, string& resultMsg)
   return true;
 }
 
-bool decodeAckMessage(const string& message, string& resultMsg)
+bool Common::decodeAckMessage(const string& message, string& resultMsg)
 {
-  resultMsg = message;
+  resultMsg = "";
+
+  // First remove all unreadable chars in resultMsg
+  for (unsigned i = 0; i < message.size(); ++i)
+  {
+    if (message[i] >= ' ' && message[i] <= '~')
+    {
+      resultMsg += message[i];
+    }
+  }
 
   // Check if message is longer than signature
   if (resultMsg.length() < ACK_SIGNATURE.length())
@@ -221,7 +230,7 @@ bool decodeAckMessage(const string& message, string& resultMsg)
   return true;
 }
 
-bool unicastMessage(int sock, struct sockaddr_storage& target, const string& msg)
+bool Common::unicastMessage(int sock, struct sockaddr_storage& target, const string& msg)
 {
   int sendBytes = -1;
   if (target.ss_family == AF_INET)

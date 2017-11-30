@@ -45,13 +45,13 @@ bool ReceiverModule::run()
   }
 
   // Finally initialize unicast sender
-  if (-1 == (mUnicastSenderSock = createSocket(isIpV6())))
+  if (-1 == (mUnicastSenderSock = Common::createSocket(isIpV6())))
   {
     LOG_ERROR("Cannot create socket");
     return false;
   }
 
-  if (-1 == setReuseSocket(mUnicastSenderSock))
+  if (-1 == Common::setReuseSocket(mUnicastSenderSock))
   {
     LOG_ERROR("Cannot set reuse socket");
     return false;
@@ -128,7 +128,7 @@ bool ReceiverModule::run()
 
       // print result message
       string decodedMsg;
-      if (decodeAckMessage(buffer, decodedMsg))
+      if (Common::decodeAckMessage(buffer, decodedMsg))
       {
         if (isIpV6())
         {
@@ -143,19 +143,19 @@ bool ReceiverModule::run()
       {
         if (isIpV6())
         {
-          printf("%-40s - %s\n", senderIp, buffer);
+          printf("%-40s - %s\n", senderIp, decodedMsg.c_str());
         }
         else
         {
-          printf("%-15s - %s\n", senderIp, buffer);
+          printf("%-15s - %s\n", senderIp, decodedMsg.c_str());
         }
       }
 
 
       // Build response message
       string responseMsg;
-      encodeAckMessage(buffer, responseMsg);
-      if (!unicastMessage(mUnicastSenderSock, sender, responseMsg))
+      Common::encodeAckMessage(buffer, responseMsg);
+      if (!Common::unicastMessage(mUnicastSenderSock, sender, responseMsg))
       {
         LOG_ERROR("sending ack message to " << senderIp);
       }

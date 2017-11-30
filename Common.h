@@ -39,13 +39,13 @@ using std::map;
 
 // print out error message to stderr
 #define LOG_ERROR(msg) \
-    do {if (!isDebugMode()) std::cerr << "[ERROR] " << msg << endl;\
+    do {if (!Common::isDebugMode()) std::cerr << "[ERROR] " << msg << endl;\
         else std::cerr << __FILE__ << ":" << __LINE__ << "-(" \
         <<__func__ << ") [ERROR] " << msg << endl;\
     } while(0)
 
 #define LOG_DEBUG(msg) \
-    do {if (isDebugMode()) std::cerr << __FILE__ << ":" \
+    do {if (Common::isDebugMode()) std::cerr << __FILE__ << ":" \
         << __LINE__ << "-(" <<__func__ << ") [DEBUG] " << msg << endl;\
     } while(0)
 
@@ -72,6 +72,9 @@ struct IfaceData
 private:
   friend std::ostream & operator<<(std::ostream &os, const IfaceData& iface);
 };
+
+namespace Common
+{
 
 /**
  * Get ip addresses for ifaceName
@@ -127,4 +130,5 @@ bool decodeAckMessage(const string& message, string& resultMsg);
  */
 bool unicastMessage(int sock, struct sockaddr_storage& target, const string& msg);
 
+}
 #endif /*COMMON_H_*/
