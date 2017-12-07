@@ -7,8 +7,9 @@
  * Maps contain all interface data
  * These maps should only be populated once
  */
-static map<string, vector<string> > g_if4_name2ip_map;
-static map<string, vector<string> > g_if6_name2ip_map;
+typedef map<string, vector<string> > IfaceName2IpMap; // map[iface name] = vector<ip address>
+static IfaceName2IpMap g_if4_name2ip_map;
+static IfaceName2IpMap g_if6_name2ip_map;
 
 // Debug info
 static bool g_debugMode = false;
@@ -22,11 +23,9 @@ static const string ACK_SIGNATURE = "-MCAST-ACK"; // append to make the ack mess
  */
 static int common_init()
 {
-  static bool alreadyRan = false;
   static int retVal = -1;
-  if (!alreadyRan)
+  if (0 != retVal)
   {
-    alreadyRan = true;
     struct ifaddrs *ifap;
     if (0 != (retVal = getifaddrs(&ifap)))
     {
@@ -265,4 +264,35 @@ bool Common::unicastMessage(int sock, struct sockaddr_storage& target, const str
 
   LOG_DEBUG("[OK] sent: " << sendBytes << " bytes");
   return true;
+}
+
+const vector<string>& Common::getAllIfaceNames(bool useIpV6)
+{
+  // Init to get all iface info first
+  (void) common_init();
+
+  static vector<string> allIfacesV4, allIfacesV6;
+  // Populate all iface names v4
+  if (allIfacesV4.size() != g_if4_name2ip_map.size())
+  {
+    allIfacesV4.clear();
+    for (IfaceName2IpMap::const_iterator mapIt = g_if4_name2ip_map.begin();
+            mapIt != g_if4_name2ip_map.end(); ++mapIt)
+    {
+      allIfacesV4.push_back(mapIt->first);
+    }
+  }
+
+  // Populate all iface names v6
+  if (allIfacesV6.size() != g_if6_name2ip_map.size())
+  {
+    allIfacesV6.clear();
+    for (IfaceName2IpMap::const_iterator mapIt = g_if6_name2ip_map.begin();
+        mapIt != g_if6_name2ip_map.end(); ++mapIt)
+    {
+      allIfacesV6.push_back(mapIt->first);
+    }
+  }
+
+  return useIpV6? allIfacesV6 : allIfacesV4;
 }

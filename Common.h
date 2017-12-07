@@ -13,6 +13,7 @@
 #include <iostream>
 #include <signal.h>
 #include <execinfo.h>
+#include <algorithm>
 
 #include <sys/select.h>
 #include <sys/ioctl.h>
@@ -85,6 +86,13 @@ namespace Common
  * @return 0 on success, -1 if error
  */
 int getIfaceIPFromIfaceName(const string& ifaceName, vector<string>& ifaceIpAdresses, bool isIpV6 = false);
+
+/**
+ * Get a set of all interface names that are up (have ip address)
+ * @param useIpV6
+ * @return set of up interfaces
+ */
+const vector<string>& getAllIfaceNames(bool useIpV6 = false);
 
 /**
  * Create udp socket

@@ -37,7 +37,8 @@ static void usage(int /*argc*/, char * argv[])
       << "    -s                 server mode: both listen and send periodic messages" << endl
       << "                        use -i to specify interval, default is " << DEFAULT_SERVER_INTERVAL
                                  << " second" << endl
-      << "    -o {n}             turn on loop back on the first n interfaces, default: all" << endl
+      << "    -o {n}             turn on loop back on the first n interfaces, default: all" << endl\
+      << "    -a                 use all eligible interfaces except localhost" << endl
       << "    -h                 This message, (version " __DATE__ << " " << __TIME__ << ")" << endl << endl;
 
   exit(1);
@@ -98,11 +99,12 @@ int main(int argc, char** argv)
   int mcastPort = DEFAULT_MCAST_PORT;
   int exitVal = 0;
   float sendInterval = -1;
+  bool useAllIfaces = false;
 
   g_ifaces.clear();
 
   int command = -1;
-  while ((command = getopt(argc, argv, "sD6lo:m:p:i:h")) != -1)
+  while ((command = getopt(argc, argv, "asD6lo:m:p:i:h")) != -1)
   {
     switch (command)
     {
@@ -127,6 +129,9 @@ int main(int argc, char** argv)
       break;
     case 's':
       mode = SERVER;
+      break;
+    case 'a':
+      useAllIfaces = true;
       break;
     case 'D':
       cout << "Debug mode ON" << endl;
@@ -178,14 +183,38 @@ int main(int argc, char** argv)
   signal(SIGPIPE, errorHandler);
 
   /*
+   * Put all iface names in iface set
+   */
+  vector<string> ifaceNames;
+  if (useAllIfaces)
+  {
+    // use all available interfaces
+    ifaceNames = Common::getAllIfaceNames(useIPv6);
+
+    // remove localhost if found in ifaceNames
+    if (ifaceNames.end() != std::find(ifaceNames.begin(), ifaceNames.end(), "lo"))
+    {
+      ifaceNames.erase(std::remove(ifaceNames.begin(), ifaceNames.end(), "lo"), ifaceNames.end());
+    }
+  }
+  else
+  {
+    // use specified interfaces
+    for (int i = optind; i < argc; ++i)
+    {
+      ifaceNames.push_back(argv[i]);
+    }
+  }
+
+  /*
    * Now get iface info
    */
   int fd = -1;
-  for (int i = optind; i < argc; ++i)
+  for (unsigned i = 0; i < ifaceNames.size(); ++i)
   {
-    const string ifaceName = argv[i];
+    const string ifaceName = ifaceNames[i];
     vector<string> ifaceAddresses;
-    if (READER != mode || i == optind)
+    if (READER != mode || i == 0)
     {
       fd = Common::createSocket(useIPv6);
     }
