@@ -13,6 +13,7 @@ Therefore, may I introduce you mcastit: a network tool that specializes in netwo
  * IPv4 & IPv6
  * Multicast sender with/without loopback & interval
  * Multiple network interface support
+ * C++98 compliant
 
 ### Usage
 
