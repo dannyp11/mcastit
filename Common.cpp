@@ -73,7 +73,11 @@ static int common_init()
 int Common::createSocket(bool isIpV6)
 {
   int sockFamily = (isIpV6) ? AF_INET6 : AF_INET;
+#ifdef SOCK_CLOEXEC
   return socket(sockFamily, SOCK_DGRAM|SOCK_CLOEXEC, 0);
+#else
+  return socket(sockFamily, SOCK_DGRAM, 0);
+#endif
 }
 
 int Common::getIfaceIPFromIfaceName(const string& ifaceName, vector<string>& ifaceIpAdresses, bool isIpV6)
