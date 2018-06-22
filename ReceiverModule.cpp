@@ -34,7 +34,7 @@ bool ReceiverModule::run()
     if (setOk != 0)
     {
       LOG_ERROR("Error " << setOk << " setting mcast for " << mIfaces[i]);
-      return false;
+      continue;
     }
     else
     {
@@ -56,7 +56,32 @@ bool ReceiverModule::run()
     LOG_ERROR("Cannot set reuse socket");
     return false;
   }
-  maxSockD = (maxSockD < mUnicastSenderSock) ? mUnicastSenderSock : maxSockD;
+
+  // Bind ucast sock port to mcast port
+  int ret = -1;
+  if (isIpV6())
+  {
+    struct sockaddr_in6 ucastSrcAddr;
+    memset(&ucastSrcAddr, 0, sizeof(ucastSrcAddr));
+    ucastSrcAddr.sin6_family = AF_INET6;
+    ucastSrcAddr.sin6_port = htons(0);
+    ret = ::bind(mUnicastSenderSock, (struct sockaddr *) &ucastSrcAddr, sizeof(ucastSrcAddr));
+  }
+  else
+  {
+    struct sockaddr_in ucastSrcAddr;
+    memset(&ucastSrcAddr, 0, sizeof(ucastSrcAddr));
+    ucastSrcAddr.sin_family = AF_INET;
+    ucastSrcAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    ucastSrcAddr.sin_port = htons(mMcastPort);
+    ret = ::bind(mUnicastSenderSock, (struct sockaddr*) &ucastSrcAddr, sizeof(ucastSrcAddr));
+  }
+
+  if (ret < 0)
+  {
+    LOG_ERROR("Cannot bind ack source port " << strerror(errno));
+    return false;
+  }
   cout << "==============================================================" << endl;
 
   /**
@@ -72,7 +97,6 @@ bool ReceiverModule::run()
     {
       FD_SET(mIfaces[i].sockFd, &rfds);
     }
-    FD_SET(mUnicastSenderSock, &rfds);
 
     timeout.tv_sec = 1;
     timeout.tv_usec = 1;
@@ -86,17 +110,14 @@ bool ReceiverModule::run()
     for (int i = 0; i < numReady; ++i)
     {
       // Retrieve the fd that has data
-      int fd = mUnicastSenderSock;
-      if (!FD_ISSET(fd, &rfds))
+      int fd = -1;
+      for (unsigned ii = 0; ii < mIfaces.size(); ++ii)
       {
-        for (unsigned ii = 0; ii < mIfaces.size(); ++ii)
+        fd = mIfaces[ii].sockFd;
+        if (FD_ISSET(fd, &rfds))
         {
-          fd = mIfaces[ii].sockFd;
-          if (FD_ISSET(fd, &rfds))
-          {
-            FD_CLR(fd, &rfds);
-            break;
-          }
+          FD_CLR(fd, &rfds);
+          break;
         }
       }
 
