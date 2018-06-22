@@ -78,7 +78,7 @@ bool McastModuleInterface::associateMcastWithIfaceName(int fd,
 
   struct sockaddr_in me_addr;
   memset((char*) &me_addr, 0, sizeof(me_addr));
-  me_addr.sin_port = htons(0);
+  me_addr.sin_port = htons(mMcastPort);
   me_addr.sin_family = AF_INET;
   me_addr.sin_addr.s_addr = meSinAddr;
   if (-1 == ::bind(fd, (struct sockaddr*)&me_addr, sizeof(me_addr)))
@@ -155,7 +155,7 @@ bool McastModuleInterface::associateMcastV6WithIfaceName(int fd,
   }
 
   bindAddr6.sin6_family = AF_INET6;
-  bindAddr6.sin6_port = htons(0);
+  bindAddr6.sin6_port = htons(mMcastPort);
   res = ::bind(fd, (struct sockaddr *) &bindAddr6, sizeof(bindAddr6));
   if (0 > res)
   {
