@@ -45,9 +45,9 @@ protected:
   int joinMcastIfaceV6(int sock, const char* ifaceName = "");
 
 protected:
-  vector<IfaceData> mIfaces; // all interfaces to be listened/sent to
-  vector<string> mMcastAddresses;
-  int mMcastPort, mAckPort;
+  vector<IfaceData>   mIfaces; // all interfaces to be listened/sent to
+  vector<string>      mMcastAddresses;
+  int                 mMcastPort, mAckPort;
 
 private:
   bool mIsIpV6;
