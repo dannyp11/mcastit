@@ -99,12 +99,15 @@ void* SenderModule::runUcastReceiver()
     while(numReady-- > 0)
     {
       int resultFd = -1;
+      std::string recvIfaceName = "default";
+
       for (unsigned ii = 0 ; ii < mIfaces.size(); ++ii)
       {
         resultFd = mIfaces[ii].sockFd;
         if (FD_ISSET(resultFd, &listenSet))
         {
           FD_CLR(resultFd, &listenSet);
+          recvIfaceName = mIfaces[ii].ifaceName;
           break;
         }
       }
@@ -140,16 +143,16 @@ void* SenderModule::runUcastReceiver()
       {
         if (isIpV6())
         {
-          printf("[ACK] %-45s (%s)\n", senderIp, decodedMsg.c_str());
+          printf("[ACK] %-45s -> %-10s (%s)\n", senderIp, recvIfaceName.c_str(), decodedMsg.c_str());
         }
         else
         {
-          printf("[ACK] %-15s (%s)\n", senderIp, decodedMsg.c_str());
+          printf("[ACK] %-15s -> %-10s (%s)\n", senderIp, recvIfaceName.c_str(), decodedMsg.c_str());
         }
       }
       else
       {
-        cout << "Stray message: " << rxBuf << endl;
+        printf("[STRAY] %-15s -> %-10s (%s)\n", senderIp, recvIfaceName.c_str(), rxBuf);
       }
     }
   }

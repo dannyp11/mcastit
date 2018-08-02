@@ -111,12 +111,14 @@ bool ReceiverModule::run()
     {
       // Retrieve the fd that has data
       int fd = -1;
+      std::string recvIface = "default";
       for (unsigned ii = 0; ii < mIfaces.size(); ++ii)
       {
         fd = mIfaces[ii].sockFd;
         if (FD_ISSET(fd, &rfds))
         {
           FD_CLR(fd, &rfds);
+          recvIface = mIfaces[ii].ifaceName;
           break;
         }
       }
@@ -164,11 +166,11 @@ bool ReceiverModule::run()
       {
         if (isIpV6())
         {
-          printf("%-40s - %s\n", senderIp, decodedMsg.c_str());
+          printf("%-40s -> %-15s - %s\n", senderIp, recvIface.c_str(), decodedMsg.c_str());
         }
         else
         {
-          printf("%-15s - %s\n", senderIp, decodedMsg.c_str());
+          printf("%-15s -> %-15s - %s\n", senderIp, recvIface.c_str(), decodedMsg.c_str());
         }
       }
 
